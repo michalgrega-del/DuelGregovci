@@ -13,7 +13,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 body{font-family:'Inter',system-ui,sans-serif;margin:0;transition:background .3s,color .3s}
-/* Theme vars */
 :root{--bg:#0f172a;--card:#1e293b;--card2:#334155;--text:#fff;--textSub:#94a3b8;--border:#475569;--inputBg:#334155}
 .light{--bg:#f1f5f9;--card:#ffffff;--card2:#e2e8f0;--text:#0f172a;--textSub:#64748b;--border:#cbd5e1;--inputBg:#e2e8f0}
 ::-webkit-scrollbar{width:6px}
@@ -27,7 +26,6 @@ body{font-family:'Inter',system-ui,sans-serif;margin:0;transition:background .3s
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
 @keyframes confetti-fall{0%{transform:translateY(-10vh) rotate(0deg);opacity:1}100%{transform:translateY(110vh) rotate(720deg);opacity:.3}}
 @keyframes glow{0%,100%{box-shadow:0 0 5px rgba(234,179,8,.3)}50%{box-shadow:0 0 20px rgba(234,179,8,.6)}}
-@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
 .anim-slide{animation:slide-up .5s ease-out}
 .anim-pop{animation:scale-pop .4s ease-out}
 .anim-score{animation:score-flash .5s ease-out}
@@ -52,7 +50,7 @@ accent:'#eab308',p1:'#3b82f6',p2:'#ef4444',ok:'#22c55e',err:'#ef4444',
 <div id="root"></div>
 <script type="text/babel">
 // ================================================================
-//  DUEL v3 – Moderátor
+//  DUEL v3.1 – Moderátor
 // ================================================================
 const{useState,useReducer,useContext,createContext,useEffect,useRef,useCallback,useMemo}=React;
 
@@ -89,7 +87,8 @@ historicke_podujatia:'from-orange-500/20 to-orange-600/5 border-orange-500/50',
 };
 const R2_PTS=[10,20,30,40,50];
 const R3_PTS=Array.from({length:36},(_,i)=>i*10);
-const R1_Q_COUNT=10;
+const R1_TIME=90;
+const R2_TIMER=10;
 
 /* ─── STORAGE ─── */
 const S={
@@ -143,8 +142,6 @@ const s=new Set();
 QUESTIONS_DB.filter(q=>q.difficulty===diff&&q.type!=='tiebreaker').forEach(q=>s.add(q.category));
 return[...s];
 }
-
-/* ─── THEME ─── */
 function applyTheme(t){
 if(t==='light')document.body.classList.add('light');
 else document.body.classList.remove('light');
@@ -161,8 +158,11 @@ s1:0,s2:0,active:1,tRun:false,tSec:15,
 pts:10,revealed:false,answered:false,
 gameOn:false,over:false,winner:null,selCat:null,
 tb1:'',tb2:'',
-r1phase:1,r1qCount:0,
+r1phase:1,r1qCount:0,r1timer:R1_TIME,r1tRun:false,
 showRoundSummary:false,summaryRound:null,
+usedCats:[],
+passing:false, /* "odpoveď super" – opponent answering */
+originalActive:1, /* who originally had the question */
 stats:{r1:{p1c:0,p1w:0,p2c:0,p2w:0},r2:{p1c:0,p1w:0,p2c:0,p2w:0},r3:{p1c:0,p1w:0,p2c:0,p2w:0}},
 };
 
@@ -172,7 +172,6 @@ const r3c=st.settings.r3count||20;
 switch(a.type){
 case 'NAV':return{...st,screen:a.to};
 case 'SET_TEST':return{...st,testMode:a.v};
-/* Players */
 case 'ADD_P':{const ps=[...st.players,{id:Date.now(),name:a.name,age:a.age,ts:new Date().toISOString()}];S.s('players',ps);return{...st,players:ps}}
 case 'EDIT_P':{const ps=st.players.map(p=>p.id===a.id?{...p,name:a.name,age:a.age}:p);S.s('players',ps);return{...st,players:ps}}
 case 'DEL_P':{const ps=st.players.filter(p=>p.id!==a.id);S.s('players',ps);return{...st,players:ps}}
@@ -181,15 +180,31 @@ case 'SETUP':return{...st,...a.d};
 /* ── START GAME ── */
 case 'START_GAME':{
 const u=new Set(getRecentUsedIds());
-/* R1 uses junior questions always (easy warmup) */
 const q=pickQ('junior',u);if(q)u.add(q.id);
 return{...st,screen:'game',gameOn:true,over:false,
     round:1,qNum:0,curQ:q,usedIds:u,
-    s1:0,s2:0,active:1,tRun:false,tSec:st.settings.timer,
+    s1:0,s2:0,active:1,tRun:false,tSec:R2_TIMER,
     pts:10,revealed:false,answered:false,
     winner:null,selCat:null,tb1:'',tb2:'',
-    r1phase:1,r1qCount:0,showRoundSummary:false,summaryRound:null,
+    r1phase:1,r1qCount:0,r1timer:R1_TIME,r1tRun:false,
+    showRoundSummary:false,summaryRound:null,
+    usedCats:[],passing:false,originalActive:1,
     stats:{r1:{p1c:0,p1w:0,p2c:0,p2w:0},r2:{p1c:0,p1w:0,p2c:0,p2w:0},r3:{p1c:0,p1w:0,p2c:0,p2w:0}}}}
+
+/* ── R1 Timer ── */
+case 'R1_START':return{...st,r1tRun:true};
+case 'R1_TICK':{
+const n=st.r1timer-1;
+if(n<=0){
+    /* Time's up for this player */
+    if(st.r1phase===1){
+        const u2=new Set(st.usedIds),q=pickQ('junior',u2);if(q)u2.add(q.id);
+        return{...st,r1timer:R1_TIME,r1tRun:false,r1phase:2,r1qCount:0,active:2,curQ:q,usedIds:u2,answered:false,revealed:false,pts:10}
+    }
+    return{...st,r1timer:0,r1tRun:false,showRoundSummary:true,summaryRound:1,curQ:null,answered:false,revealed:false}
+}
+return{...st,r1timer:n}
+}
 
 case 'SET_PTS':return{...st,pts:a.v};
 case 'REVEAL':return{...st,revealed:true};
@@ -201,12 +216,10 @@ const rk=st.round===1?'r1':st.round===2?'r2':'r3';
 const sk=p===1?'p1c':'p2c';
 const newStats={...st.stats,[rk]:{...st.stats[rk],[sk]:st.stats[rk][sk]+1}};
 if(st.round===1){
-    /* R1: always +10, never subtract */
     return{...st,s1:p===1?st.s1+10:st.s1,s2:p===2?st.s2+10:st.s2,answered:true,stats:newStats}
 }
-/* R2/R3: add pts */
 const pv=st.pts;
-return{...st,s1:p===1?st.s1+pv:st.s1,s2:p===2?st.s2+pv:st.s2,answered:true,tRun:false,stats:newStats}
+return{...st,s1:p===1?st.s1+pv:st.s1,s2:p===2?st.s2+pv:st.s2,answered:true,tRun:false,passing:false,stats:newStats}
 }
 
 /* ── WRONG ── */
@@ -216,18 +229,23 @@ const rk=st.round===1?'r1':st.round===2?'r2':'r3';
 const sk=p===1?'p1w':'p2w';
 const newStats={...st.stats,[rk]:{...st.stats[rk],[sk]:st.stats[rk][sk]+1}};
 if(st.round===1){
-    /* R1: wrong = 0 points, no subtraction */
     return{...st,answered:true,stats:newStats}
 }
-/* R2/R3: subtract pts */
 const pv=st.pts;
-return{...st,s1:p===1?st.s1-pv:st.s1,s2:p===2?st.s2-pv:st.s2,answered:true,tRun:false,stats:newStats}
+return{...st,s1:p===1?st.s1-pv:st.s1,s2:p===2?st.s2-pv:st.s2,answered:true,tRun:false,passing:false,stats:newStats}
 }
 
-case 'NO_POINTS':return{...st,answered:true,tRun:false};
+/* ── SKIP (R1 "Ďalej" / no points) ── */
+case 'SKIP':return{...st,answered:true,tRun:false,passing:false};
 
-/* ── Timer ── */
-case 'T_START':return{...st,tRun:true,tSec:st.settings.timer};
+/* ── PASS SUPER: opponent gets a chance ── */
+case 'PASS_SUPER':{
+const opp=st.active===1?2:1;
+return{...st,passing:true,originalActive:st.active,active:opp,tRun:true,tSec:R2_TIMER,revealed:false}
+}
+
+/* ── R2/R3 Timer ── */
+case 'T_START':return{...st,tRun:true,tSec:R2_TIMER};
 case 'T_TICK':{const n=st.tSec-1;return n<=0?{...st,tSec:0,tRun:false}:{...st,tSec:n}}
 case 'T_STOP':return{...st,tRun:false};
 
@@ -236,15 +254,13 @@ case 'NEXT_Q':{
 /* === Round 1 === */
 if(st.round===1){
     const nc=st.r1qCount+1;
-    if(nc>=R1_Q_COUNT){
+    if(st.r1timer<=0||nc>=999){
+        /* Time ran out – handled by R1_TICK */
         if(st.r1phase===1){
-            /* Player 1 done → switch to player 2 */
             const u2=new Set(st.usedIds),q=pickQ('junior',u2);if(q)u2.add(q.id);
-            return{...st,r1phase:2,r1qCount:0,active:2,curQ:q,usedIds:u2,
-                answered:false,revealed:false,pts:10}
+            return{...st,r1phase:2,r1qCount:0,r1timer:R1_TIME,r1tRun:false,active:2,curQ:q,usedIds:u2,answered:false,revealed:false,pts:10}
         }
-        /* Both done → Round 1 summary */
-        return{...st,showRoundSummary:true,summaryRound:1,tRun:false,curQ:null,answered:false,revealed:false}
+        return{...st,showRoundSummary:true,summaryRound:1,r1tRun:false,curQ:null,answered:false,revealed:false}
     }
     const u2=new Set(st.usedIds),q=pickQ('junior',u2);if(q)u2.add(q.id);
     return{...st,r1qCount:nc,curQ:q,usedIds:u2,answered:false,revealed:false,pts:10}
@@ -253,21 +269,21 @@ if(st.round===1){
 if(st.round===2){
     const nq=st.qNum+1;
     if(nq>=r2c){
-        return{...st,showRoundSummary:true,summaryRound:2,tRun:false,curQ:null,answered:false,revealed:false,selCat:null}
+        return{...st,showRoundSummary:true,summaryRound:2,tRun:false,curQ:null,answered:false,revealed:false,selCat:null,passing:false}
     }
     const na=nq%2===0?1:2;
-    return{...st,qNum:nq,curQ:null,usedIds:st.usedIds,active:na,tRun:false,
-        tSec:st.settings.timer,revealed:false,answered:false,selCat:null,pts:10}
+    return{...st,qNum:nq,curQ:null,usedIds:st.usedIds,active:na,originalActive:na,tRun:false,
+        tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,passing:false}
 }
 /* === Round 3 === */
 if(st.round===3){
     const nq=st.qNum+1;
     if(nq>=r3c){
-        return{...st,showRoundSummary:true,summaryRound:3,tRun:false,curQ:null,answered:false,revealed:false,selCat:null}
+        return{...st,showRoundSummary:true,summaryRound:3,tRun:false,curQ:null,answered:false,revealed:false,selCat:null,passing:false}
     }
     const na=nq%2===0?1:2;
-    return{...st,qNum:nq,curQ:null,usedIds:st.usedIds,active:na,tRun:false,
-        tSec:st.settings.timer,revealed:false,answered:false,selCat:null,pts:10}
+    return{...st,qNum:nq,curQ:null,usedIds:st.usedIds,active:na,originalActive:na,tRun:false,
+        tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,passing:false}
 }
 return st;
 }
@@ -275,20 +291,19 @@ return st;
 /* ── NEXT ROUND (from summary) ── */
 case 'NEXT_ROUND':{
 if(st.summaryRound===1){
-    return{...st,round:2,qNum:0,curQ:null,active:1,showRoundSummary:false,summaryRound:null,
-        tRun:false,tSec:st.settings.timer,revealed:false,answered:false,selCat:null,pts:10}
+    return{...st,round:2,qNum:0,curQ:null,active:1,originalActive:1,showRoundSummary:false,summaryRound:null,
+        tRun:false,tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,usedCats:[],passing:false}
 }
 if(st.summaryRound===2){
-    return{...st,round:3,qNum:0,curQ:null,active:1,showRoundSummary:false,summaryRound:null,
-        tRun:false,tSec:st.settings.timer,revealed:false,answered:false,selCat:null,pts:10}
+    return{...st,round:3,qNum:0,curQ:null,active:1,originalActive:1,showRoundSummary:false,summaryRound:null,
+        tRun:false,tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,usedCats:[],passing:false}
 }
 if(st.summaryRound===3){
-    /* Check for tiebreaker or winner */
     if(st.s1===st.s2){
         const u2=new Set(st.usedIds),q=pickQ(st.diff,u2,null,'tiebreaker');if(q)u2.add(q.id);
         return{...st,round:'tiebreaker',qNum:0,curQ:q,usedIds:u2,active:1,
             showRoundSummary:false,summaryRound:null,
-            tRun:false,tSec:st.settings.timer,pts:10,revealed:false,answered:false,selCat:null,tb1:'',tb2:''}
+            tRun:false,tSec:R2_TIMER,pts:10,revealed:false,answered:false,selCat:null,tb1:'',tb2:'',passing:false}
     }
     const w=st.s1>st.s2?1:2;
     return{...st,over:true,gameOn:false,winner:w,screen:'results',showRoundSummary:false,summaryRound:null}
@@ -299,7 +314,11 @@ return st;
 /* ── Category selection (R2/R3) ── */
 case 'SEL_CAT':{
 const u2=new Set(st.usedIds),q=pickQ(st.diff,u2,a.cat);if(q)u2.add(q.id);
-return{...st,curQ:q,usedIds:u2,selCat:a.cat}}
+const uc=[...st.usedCats,a.cat];
+return{...st,curQ:q,usedIds:u2,selCat:a.cat,usedCats:uc}}
+
+/* ── Confirm pts & auto-start timer (R2/R3) ── */
+case 'CONFIRM_PTS':return{...st,tRun:true,tSec:R2_TIMER};
 
 /* ── Tiebreaker ── */
 case 'TB_GUESS':return{...st,[a.p===1?'tb1':'tb2']:a.v};
@@ -316,7 +335,7 @@ const r={id:Date.now(),date:st.gameDate,p1:st.p1,p2:st.p2,s1:st.s1,s2:st.s2,
     stats:{...st.stats},usedQIds:[...st.usedIds]};
 const h=[...st.history,r];S.s('history',h);return{...st,history:h}}
 case 'END_GAME':
-return{...st,gameOn:false,over:false,screen:'home',curQ:null,tRun:false,testMode:false,showRoundSummary:false};
+return{...st,gameOn:false,over:false,screen:'home',curQ:null,tRun:false,r1tRun:false,testMode:false,showRoundSummary:false,passing:false};
 case 'UPD_SETTINGS':{
 const s={...st.settings,...a.s};S.s('settings',s);SFX.enabled=s.sound;
 if(a.s.theme!==undefined)applyTheme(a.s.theme);
@@ -331,17 +350,41 @@ default:return st;
 const Ctx=createContext();
 function Provider({children}){
 const[st,dp]=useReducer(reducer,init);
+const r1Ref=useRef(null);
 const timerRef=useRef(null);
+const autoAdvRef=useRef(null);
 
-/* Timer R2/R3 */
+/* R1 90-second timer */
+useEffect(()=>{
+    if(st.r1tRun&&st.round===1){
+        r1Ref.current=setInterval(()=>dp({type:'R1_TICK'}),1000);
+        return()=>clearInterval(r1Ref.current);
+    }else{if(r1Ref.current){clearInterval(r1Ref.current);r1Ref.current=null}}
+},[st.r1tRun,st.round]);
+
+/* R1 timer sounds */
+useEffect(()=>{
+    if(!st.r1tRun||st.round!==1)return;
+    if(st.r1timer>5)SFX.tick();else if(st.r1timer>0)SFX.tickLow();else if(st.r1timer===0)SFX.buzzer();
+},[st.r1timer,st.r1tRun,st.round]);
+
+/* R1 auto-advance: when answered, auto-go to next question after 400ms */
+useEffect(()=>{
+    if(st.round===1&&st.answered&&st.r1tRun){
+        autoAdvRef.current=setTimeout(()=>dp({type:'NEXT_Q'}),400);
+        return()=>clearTimeout(autoAdvRef.current);
+    }
+},[st.answered,st.round,st.r1tRun]);
+
+/* R2/R3 Timer */
 useEffect(()=>{
     if(st.tRun&&st.round!==1){
         timerRef.current=setInterval(()=>dp({type:'T_TICK'}),1000);
         return()=>clearInterval(timerRef.current);
-    }else{if(timerRef.current)clearInterval(timerRef.current)}
+    }else{if(timerRef.current){clearInterval(timerRef.current);timerRef.current=null}}
 },[st.tRun,st.round]);
 
-/* Timer sounds */
+/* R2/R3 Timer sounds */
 useEffect(()=>{
     if(!st.tRun||st.round===1)return;
     if(st.tSec>3)SFX.tick();else if(st.tSec>0)SFX.tickLow();else if(st.tSec===0)SFX.buzzer();
@@ -353,29 +396,30 @@ useEffect(()=>{
     if(!st.gameOn&&st.screen!=='results'&&!st.showRoundSummary){
         sendTV('WAITING',{});return;
     }
-    const r2c=st.settings.r2count||10,r3c=st.settings.r3count||20;
-    const cats=st.round===2||st.round===3?getCats(st.diff):[];
+    const allCats=getCats(st.diff);
+    const availCats=allCats.filter(c=>!st.usedCats.includes(c));
     const payload={
         screen:st.screen,p1:st.p1,p2:st.p2,s1:st.s1,s2:st.s2,
         round:st.round,roundName:ROUND_NAMES[st.round],
         qNum:st.round===1?st.r1qCount+1:st.qNum+1,
-        qTotal:st.round===1?R1_Q_COUNT:st.round===2?r2c:r3c,
+        qTotal:st.round===1?'∞':st.round===2?r2c:r3c,
         q:st.curQ?{question:st.curQ.question,category:CAT_LABELS[st.curQ.category]||st.curQ.category,
             catKey:st.curQ.category,type:st.curQ.type}:null,
         answer:st.revealed?st.curQ?.answer:null,
-        active:st.active,tRun:st.tRun,tSec:st.tSec,tDur:st.settings.timer,
+        active:st.active,tRun:st.tRun,tSec:st.tSec,tDur:R2_TIMER,
         pts:st.pts,diff:st.diff,
         over:st.over,winner:st.winner,answered:st.answered,
-        r1phase:st.r1phase,selCat:st.selCat,
+        r1phase:st.r1phase,r1timer:st.r1timer,r1tRun:st.r1tRun,
+        selCat:st.selCat,
         showRoundSummary:st.showRoundSummary,summaryRound:st.summaryRound,
-        stats:st.stats,categories:cats,
+        stats:st.stats,categories:availCats,usedCats:st.usedCats,
+        passing:st.passing,originalActive:st.originalActive,
         tb1:st.tb1,tb2:st.tb2,tbQ:st.round==='tiebreaker'&&st.curQ?{question:st.curQ.question,answer:st.revealed?st.curQ.answer:null}:null,
         theme:st.settings.theme||'dark',
     };
     sendTV('UPDATE',payload);
 });
 
-/* Init theme */
 useEffect(()=>{
     SFX.enabled=st.settings.sound;
     applyTheme(st.settings.theme||'dark');
@@ -395,7 +439,6 @@ const Card=({children,cls=''})=><div className={`rounded-2xl p-5 border ${cls}`}
 /* ════════════ HOME ════════════ */
 function HomeScreen(){
 const{st,dp}=use$();
-const isDark=(st.settings.theme||'dark')==='dark';
 return(
 <div className="flex flex-col items-center justify-center min-h-screen gap-6 p-6">
     <div className="anim-float">
@@ -524,45 +567,42 @@ return(
 );
 }
 
-/* ════════════════════════════════════════════════
-   CATEGORY GRID COMPONENT (for R2/R3)
-   ════════════════════════════════════════════════ */
-function CategoryGrid({cats,onPick,activePlayer,round}){
+/* ════════════ CATEGORY GRID (R2/R3) ════════════ */
+function CategoryGrid({cats,onPick,activePlayer}){
 return(
 <div>
     <p className="text-center mb-4">
-        <span className={`font-bold text-lg ${activePlayer===1?'text-p1':'text-p2'}`}>
+        <span className={`font-bold text-xl ${activePlayer===1?'text-p1':'text-p2'}`}>
             {activePlayer===1?'🔵':'🔴'} Hráč {activePlayer}
         </span>
-        <span style={{color:'var(--textSub)'}} className="ml-2">vyberá okruh</span>
+        <span style={{color:'var(--textSub)'}} className="ml-2 text-lg">vyberá okruh</span>
     </p>
+    {cats.length===0?<p className="text-center text-accent text-lg font-bold py-8">Všetky okruhy boli použité!</p>:
     <div className="grid grid-cols-2 gap-3">
         {cats.map(c=>(
             <button key={c} onClick={()=>onPick(c)}
-                className={`cat-card p-4 rounded-2xl border-2 bg-gradient-to-br text-left ${CAT_COLORS[c]||'from-slate-500/20 to-slate-600/5 border-slate-500/50'}`}>
+                className={`cat-card p-5 rounded-2xl border-2 bg-gradient-to-br text-left ${CAT_COLORS[c]||'from-slate-500/20 to-slate-600/5 border-slate-500/50'}`}>
                 <div className="flex items-center gap-3">
-                    <span className="text-2xl">{CAT_ICONS[c]||'❓'}</span>
-                    <span className="font-bold text-sm">{CAT_LABELS[c]||c}</span>
+                    <span className="text-3xl">{CAT_ICONS[c]||'❓'}</span>
+                    <span className="font-bold text-base">{CAT_LABELS[c]||c}</span>
                 </div>
             </button>
         ))}
-    </div>
+    </div>}
 </div>
 );
 }
 
-/* ════════════════════════════════════════════════
-   EMBEDDED TV (test mode)
-   ════════════════════════════════════════════════ */
+/* ════════════ EMBEDDED TV (test mode) ════════════ */
 function EmbeddedTV(){
 const{st}=use$();
 const isJunior=st.diff==='junior';
 const r2c=st.settings.r2count||10,r3c=st.settings.r3count||20;
 const qNum=st.round===1?st.r1qCount+1:st.qNum+1;
-const qTotal=st.round===1?R1_Q_COUNT:st.round===2?r2c:r3c;
-const cats=getCats(st.diff);
+const qTotal=st.round===1?'∞':st.round===2?r2c:r3c;
+const allCats=getCats(st.diff);
+const availCats=allCats.filter(c=>!st.usedCats.includes(c));
 
-/* Waiting */
 if(!st.gameOn&&st.screen!=='results'&&!st.showRoundSummary)return(
     <div className={`h-full flex flex-col items-center justify-center ${isJunior?'junior-bg':'standard-bg'}`}>
         <div className="anim-float"><h1 className="text-6xl font-black text-accent">DUEL</h1></div>
@@ -608,20 +648,12 @@ if(st.over||st.screen==='results'){
                 <h2 className="text-lg text-slate-400 mb-1">Víťaz súťaže</h2>
                 <h1 className={`text-4xl font-black ${wc} mb-4`}>{wn}</h1>
                 <div className="flex items-center justify-center gap-8 mb-6">
-                    <div className="text-center">
-                        <div className="text-xs text-blue-400 mb-1">{st.p1?.name}</div>
-                        <div className="text-4xl font-black text-blue-400">{st.s1}</div>
-                    </div>
+                    <div className="text-center"><div className="text-xs text-blue-400 mb-1">{st.p1?.name}</div><div className="text-4xl font-black text-blue-400">{st.s1}</div></div>
                     <div className="text-2xl text-slate-700">:</div>
-                    <div className="text-center">
-                        <div className="text-xs text-red-400 mb-1">{st.p2?.name}</div>
-                        <div className="text-4xl font-black text-red-400">{st.s2}</div>
-                    </div>
+                    <div className="text-center"><div className="text-xs text-red-400 mb-1">{st.p2?.name}</div><div className="text-4xl font-black text-red-400">{st.s2}</div></div>
                 </div>
                 <table className="mx-auto text-sm border-collapse">
-                    <thead>
-                        <tr className="text-slate-400"><th className="px-3 py-1"></th><th className="px-3 py-1 text-blue-400">{st.p1?.name}</th><th className="px-3 py-1 text-red-400">{st.p2?.name}</th></tr>
-                    </thead>
+                    <thead><tr className="text-slate-400"><th className="px-3 py-1"></th><th className="px-3 py-1 text-blue-400">{st.p1?.name}</th><th className="px-3 py-1 text-red-400">{st.p2?.name}</th></tr></thead>
                     <tbody>
                         <tr><td className="px-3 py-1 text-slate-500">Správne</td><td className="px-3 py-1 text-green-400 font-bold text-center">{p1tc}</td><td className="px-3 py-1 text-green-400 font-bold text-center">{p2tc}</td></tr>
                         <tr><td className="px-3 py-1 text-slate-500">Nesprávne</td><td className="px-3 py-1 text-red-400 font-bold text-center">{p1tw}</td><td className="px-3 py-1 text-red-400 font-bold text-center">{p2tw}</td></tr>
@@ -638,7 +670,7 @@ if(st.round==='tiebreaker'&&st.curQ)return(
         <div className="anim-slide text-center max-w-lg p-4">
             <h2 className="text-2xl font-bold text-accent mb-4">⚡ Rozstrel</h2>
             <div className="bg-black/40 border border-accent/20 rounded-2xl p-6 mb-4">
-                <p className="text-xl font-bold">{st.curQ.question}</p>
+                <p className="text-2xl font-bold">{st.curQ.question}</p>
             </div>
             {st.revealed&&<p className="text-green-400 font-bold text-lg">Správna odpoveď: {st.curQ.answer}</p>}
         </div>
@@ -656,32 +688,37 @@ if((st.round===2||st.round===3)&&!st.selCat)return(
             </div>
             <span className="text-slate-400">Otázka {qNum}/{qTotal}</span>
         </div>
-        <div className="flex-1 flex flex-col items-center justify-center p-6">
-            <p className="text-lg mb-4">
+        <div className="flex-1 flex flex-col items-center justify-center p-4">
+            <p className="text-xl mb-4">
                 <span className={`font-bold ${st.active===1?'text-blue-400':'text-red-400'}`}>
                     {st.active===1?st.p1?.name:st.p2?.name}
                 </span>
                 <span className="text-slate-400 ml-2">vyberá okruh</span>
             </p>
+            {availCats.length===0?<p className="text-accent text-xl font-bold py-8">Všetky okruhy použité!</p>:
             <div className="grid grid-cols-2 gap-3 max-w-2xl w-full">
-                {cats.map(c=>(
-                    <div key={c} className={`p-4 rounded-2xl border-2 bg-gradient-to-br ${CAT_COLORS[c]||'from-slate-500/20 to-slate-600/5 border-slate-500/50'}`}>
+                {availCats.map(c=>(
+                    <div key={c} className={`p-5 rounded-2xl border-2 bg-gradient-to-br ${CAT_COLORS[c]||'from-slate-500/20 to-slate-600/5 border-slate-500/50'}`}>
                         <div className="flex items-center gap-3">
                             <span className="text-3xl">{CAT_ICONS[c]||'❓'}</span>
-                            <span className="font-bold">{CAT_LABELS[c]||c}</span>
+                            <span className="font-bold text-lg">{CAT_LABELS[c]||c}</span>
                         </div>
                     </div>
                 ))}
-            </div>
+            </div>}
         </div>
     </div>
 );
 
 /* Active game (question shown) */
-const timerFrac=st.settings.timer>0?st.tSec/st.settings.timer:1;
+const timerFrac=R2_TIMER>0?st.tSec/R2_TIMER:1;
 const circ=2*Math.PI*42;
 const dashOff=circ*(1-timerFrac);
 const tCol=st.tSec<=3?'#ef4444':st.tSec<=6?'#eab308':'#22c55e';
+/* R1 timer display */
+const r1frac=st.r1timer/R1_TIME;
+const r1dashOff=circ*(1-r1frac);
+const r1Col=st.r1timer<=10?'#ef4444':st.r1timer<=20?'#eab308':'#22c55e';
 
 return(
     <div className={`h-full flex flex-col ${isJunior?'junior-bg':'standard-bg'} overflow-hidden`}>
@@ -691,7 +728,7 @@ return(
                 <span className="text-slate-500">│</span>
                 <span className="text-slate-300">{ROUND_NAMES[st.round]}</span>
             </div>
-            <span className="text-slate-400">Otázka {qNum}/{qTotal}</span>
+            <span className="text-slate-400">{st.round===1?`${st.r1phase===1?st.p1?.name:st.p2?.name}`:`Otázka ${qNum}/${qTotal}`}</span>
         </div>
         <div className="flex-1 flex items-center justify-between px-4 py-2 gap-4">
             {/* P1 */}
@@ -701,8 +738,20 @@ return(
                 <div className="text-center"><div className={`text-4xl font-black ${st.s1<0?'text-red-400':'text-p1'}`}>{st.s1}</div></div>
             </div>
             {/* Center */}
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 max-w-sm">
-                {st.round!==1&&(st.tRun||st.tSec<st.settings.timer)&&(
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 max-w-lg">
+                {/* R1: 90s timer */}
+                {st.round===1&&st.r1tRun&&(
+                    <div className="relative flex items-center justify-center">
+                        <svg width="80" height="80" viewBox="0 0 96 96" className={st.r1timer<=10?'anim-pulse':''}>
+                            <circle cx="48" cy="48" r="42" fill="none" stroke="#1e293b" strokeWidth="4"/>
+                            <circle cx="48" cy="48" r="42" fill="none" stroke={r1Col} strokeWidth="4"
+                                strokeDasharray={circ} strokeDashoffset={r1dashOff} strokeLinecap="round" className="timer-ring" transform="rotate(-90 48 48)"/>
+                        </svg>
+                        <span className={`absolute text-2xl font-black ${st.r1timer<=10?'text-red-400':'text-white'}`}>{st.r1timer}</span>
+                    </div>
+                )}
+                {/* R2/R3 timer */}
+                {st.round!==1&&st.round!=='tiebreaker'&&(st.tRun||st.tSec<R2_TIMER)&&(
                     <div className="relative flex items-center justify-center">
                         <svg width="80" height="80" viewBox="0 0 96 96" className={st.tRun&&st.tSec<=3?'anim-pulse':''}>
                             <circle cx="48" cy="48" r="42" fill="none" stroke="#1e293b" strokeWidth="4"/>
@@ -713,14 +762,15 @@ return(
                     </div>
                 )}
                 {st.round===1&&<div className="text-center text-sm text-slate-400">{st.r1phase===1?st.p1?.name:st.p2?.name} odpovedá · 10 bodov</div>}
-                <div className="flex items-center gap-1"><span className="text-accent font-black text-xl">{st.pts}</span><span className="text-slate-400 text-xs">b</span></div>
+                {st.round!==1&&st.curQ&&<div className="flex items-center gap-1"><span className="text-accent font-black text-xl">{st.pts}</span><span className="text-slate-400 text-xs">b</span></div>}
+                {st.passing&&<div className="text-center text-yellow-400 font-bold text-sm animate-pulse">⚡ ODPOVEĎ SUPER</div>}
                 {st.curQ?(
                     <div className="anim-slide text-center w-full">
                         <span className={`text-[10px] font-semibold uppercase tracking-widest mb-1 block ${isJunior?'text-purple-400':'text-accent/70'}`}>
                             {CAT_LABELS[st.curQ.category]||st.curQ.category}
                         </span>
                         <div className={`bg-black/40 border ${isJunior?'border-purple-500/30':'border-accent/20'} rounded-xl p-4`}>
-                            <p className="font-bold text-base leading-snug">{st.curQ.question}</p>
+                            <p className="font-bold text-lg leading-snug">{st.curQ.question}</p>
                         </div>
                     </div>
                 ):<div className="text-slate-600 text-sm">Čakám na otázku…</div>}
@@ -747,9 +797,20 @@ const isR1=st.round===1;
 const isR2=st.round===2;
 const isR3=st.round===3;
 const r2c=st.settings.r2count||10,r3c=st.settings.r3count||20;
-const qTotal=isR1?R1_Q_COUNT:isR2?r2c:r3c;
+const qTotal=isR1?'∞':isR2?r2c:r3c;
 const qDisplay=isR1?st.r1qCount+1:st.qNum+1;
-const cats=useMemo(()=>getCats(st.diff),[st.diff]);
+const allCats=useMemo(()=>getCats(st.diff),[st.diff]);
+const availCats=allCats.filter(c=>!st.usedCats.includes(c));
+
+/* R1 action handlers – auto-advance */
+const r1Correct=()=>{SFX.correct();dp({type:'CORRECT'})};
+const r1Wrong=()=>{SFX.wrong();dp({type:'WRONG'})};
+const r1Skip=()=>{dp({type:'SKIP'})};
+
+/* R2/R3 action handlers */
+const r2Correct=()=>{SFX.correct();dp({type:'CORRECT'})};
+const r2Wrong=()=>{SFX.wrong();dp({type:'WRONG'})};
+const r2Super=()=>{dp({type:'PASS_SUPER'})};
 
 /* ── ROUND SUMMARY VIEW ── */
 if(st.showRoundSummary){
@@ -806,7 +867,8 @@ const header=(
                 style={{color:'var(--textSub)'}} className="hover:text-red-400 text-sm">✕ Koniec</button>
             {st.testMode&&<span className="bg-purple-600/30 text-purple-300 text-xs px-2 py-0.5 rounded-lg font-bold">🧪 TEST</span>}
             <span className="text-accent font-bold">{typeof st.round==='number'?`Kolo ${st.round}/3: `:''}{ROUND_NAMES[st.round]}</span>
-            {!isTB&&<span style={{color:'var(--textSub)'}} className="text-sm">Otázka {qDisplay}/{qTotal}</span>}
+            {isR1&&<span className="text-sm" style={{color:'var(--textSub)'}}>Fáza: {st.r1phase===1?st.p1?.name:st.p2?.name}</span>}
+            {!isR1&&!isTB&&<span style={{color:'var(--textSub)'}} className="text-sm">Otázka {qDisplay}/{qTotal}</span>}
         </div>
         <div className="flex items-center gap-3">
             {st.testMode&&<Btn cls="text-xs py-1 px-2" style={{background:'var(--card2)'}} onClick={()=>dp({type:'SET_TEST',v:false})}>📺 Produkcia</Btn>}
@@ -816,7 +878,10 @@ const header=(
 );
 
 /* ── Player Card ── */
-const playerCard=(num,name,score,isActive)=>(
+const playerCard=(num,name,score,isActive)=>{
+const isActiveAndR1=isR1&&isActive&&!st.answered;
+const isActiveR23=(isR2||isR3)&&isActive&&st.curQ&&!st.answered;
+return(
     <div className={`rounded-2xl p-4 border-2 transition-all duration-300 ${
         isActive?(num===1?'border-p1 bg-blue-500/10 shadow-lg shadow-blue-500/20':'border-p2 bg-red-500/10 shadow-lg shadow-red-500/20')
         :''}`} style={!isActive?{background:'var(--card)',borderColor:'var(--border)'}:{}}>
@@ -824,55 +889,78 @@ const playerCard=(num,name,score,isActive)=>(
             <span className={`w-3 h-3 rounded-full ${num===1?'bg-p1':'bg-p2'} ${isActive?'animate-pulse':''}`}/>
             <span className="font-bold">{name}</span>
             {isActive&&<span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-lg font-bold">ODPOVEDÁ</span>}
+            {st.passing&&isActive&&<span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-lg font-bold">SUPER</span>}
         </div>
         <div className={`text-4xl font-black ${score<0?'text-red-400':num===1?'text-p1':'text-p2'}`}>{score}</div>
         <div className="text-xs" style={{color:'var(--textSub)'}}>bodov</div>
-        {/* R1 controls: only active player */}
-        {isR1&&isActive&&!st.answered&&(
-            <div className="flex gap-2 mt-3">
-                <Btn cls="bg-ok/20 text-ok hover:bg-ok/30 text-sm py-1 px-3" onClick={()=>{dp({type:'CORRECT'});SFX.correct()}}>✓ Správne</Btn>
-                <Btn cls="bg-red-500/20 text-red-400 hover:bg-red-500/30 text-sm py-1 px-3" onClick={()=>{dp({type:'WRONG'});SFX.wrong()}}>✗ Nesprávne</Btn>
+        {/* R1 controls */}
+        {isActiveAndR1&&st.r1tRun&&(
+            <div className="flex gap-2 mt-3 flex-wrap">
+                <Btn cls="bg-ok/20 text-ok hover:bg-ok/30 text-sm py-2 px-3 flex-1" onClick={r1Correct}>✓ Správne</Btn>
+                <Btn cls="bg-red-500/20 text-red-400 hover:bg-red-500/30 text-sm py-2 px-3 flex-1" onClick={r1Wrong}>✗ Zle</Btn>
+                <Btn cls="text-sm py-2 px-3 flex-1" style={{background:'var(--card2)',color:'var(--textSub)'}} onClick={r1Skip}>→ Ďalej</Btn>
             </div>
         )}
-        {/* R2/R3 controls: only active player when question is shown */}
-        {(isR2||isR3)&&isActive&&st.curQ&&!st.answered&&(
-            <div className="flex gap-2 mt-3">
-                <Btn cls="bg-ok/20 text-ok hover:bg-ok/30 text-sm py-1 px-3" onClick={()=>{dp({type:'CORRECT'});SFX.correct()}}>✓ Správne</Btn>
-                <Btn cls="bg-red-500/20 text-red-400 hover:bg-red-500/30 text-sm py-1 px-3" onClick={()=>{dp({type:'WRONG'});SFX.wrong()}}>✗ Nesprávne</Btn>
+        {/* R2/R3 controls */}
+        {isActiveR23&&(
+            <div className="flex gap-2 mt-3 flex-wrap">
+                <Btn cls="bg-ok/20 text-ok hover:bg-ok/30 text-sm py-2 px-3 flex-1" onClick={r2Correct}>✓ Správne</Btn>
+                <Btn cls="bg-red-500/20 text-red-400 hover:bg-red-500/30 text-sm py-2 px-3 flex-1" onClick={r2Wrong}>✗ Zle</Btn>
+                {!st.passing&&<Btn cls="bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 text-sm py-2 px-3 flex-1" onClick={r2Super}>⚡ Super</Btn>}
             </div>
         )}
     </div>
 );
+};
 
-/* ── R1 info bar ── */
+/* ── R1 info bar with timer ── */
 const r1Info=isR1&&(
-    <div className="mt-3 p-3 rounded-xl border text-center" style={{background:'var(--card)',borderColor:'var(--border)'}}>
-        <p className="text-sm">
-            <span className={`font-bold ${st.active===1?'text-p1':'text-p2'}`}>{st.active===1?st.p1?.name:st.p2?.name}</span>
-            <span style={{color:'var(--textSub)'}} className="ml-2">odpovedá · Otázka {st.r1qCount+1}/10 · 10 bodov</span>
-        </p>
+    <div className="mt-3 p-4 rounded-xl border" style={{background:'var(--card)',borderColor:'var(--border)'}}>
+        <div className="flex items-center justify-between">
+            <div>
+                <p className="text-lg font-bold">
+                    <span className={st.active===1?'text-p1':'text-p2'}>{st.active===1?st.p1?.name:st.p2?.name}</span>
+                    <span style={{color:'var(--textSub)'}} className="ml-2 text-sm">· 10 bodov za správnu</span>
+                </p>
+                <p className="text-xs mt-1" style={{color:'var(--textSub)'}}>Otázka #{st.r1qCount+1}</p>
+            </div>
+            <div className="flex items-center gap-3">
+                <div className={`text-4xl font-black ${st.r1timer<=10?'text-red-400':st.r1timer<=20?'text-yellow-400':'text-accent'}`}>
+                    {st.r1timer}s
+                </div>
+                {!st.r1tRun&&<Btn cls="bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 py-2 px-4 text-lg" onClick={()=>dp({type:'R1_START'})}>▶ Štart</Btn>}
+            </div>
+        </div>
+        {st.r1tRun&&(
+            <div className="mt-2 h-2 rounded-full overflow-hidden" style={{background:'var(--card2)'}}>
+                <div className="h-full rounded-full timeline-bar" style={{width:((st.r1timer/R1_TIME)*100)+'%',background:st.r1timer<=10?'#ef4444':st.r1timer<=20?'#eab308':'#22c55e'}}/>
+            </div>
+        )}
     </div>
 );
 
 /* ── Category picker (R2/R3) ── */
 const catPicker=(isR2||isR3)&&!st.selCat&&(
     <div className="mt-3">
-        <CategoryGrid cats={cats} activePlayer={st.active} round={st.round}
+        <CategoryGrid cats={availCats} activePlayer={st.active}
             onPick={c=>dp({type:'SEL_CAT',cat:c})}/>
     </div>
 );
 
-/* ── Point picker (R2/R3, after category selected) ── */
-const ptsPicker=(isR2||isR3)&&st.selCat&&!st.answered&&(
+/* ── Point picker (R2/R3, after category selected, before timer) ── */
+const[ptsConfirmed,setPtsConfirmed]=useState(false);
+useEffect(()=>{setPtsConfirmed(false)},[st.qNum,st.round,st.selCat]);
+const ptsPicker=(isR2||isR3)&&st.selCat&&!st.tRun&&!ptsConfirmed&&!st.answered&&!st.passing&&(
     <Card cls="mt-3">
-        <p className="text-sm mb-3" style={{color:'var(--textSub)'}}>
-            <span className={`font-bold ${st.active===1?'text-p1':'text-p2'}`}>{st.active===1?st.p1?.name:st.p2?.name}</span> si vyberá stávku bodov:
+        <p className="text-lg mb-3 font-semibold">
+            <span className={st.active===1?'text-p1':'text-p2'}>{st.active===1?st.p1?.name:st.p2?.name}</span>
+            <span style={{color:'var(--textSub)'}} className="ml-2">stávka bodov:</span>
         </p>
         {isR2?(
             <div className="flex gap-2">
                 {R2_PTS.map(v=>(
                     <button key={v} onClick={()=>dp({type:'SET_PTS',v})}
-                        className={`flex-1 py-3 rounded-xl font-black text-lg transition-all ${st.pts===v?'bg-accent text-black scale-105 shadow-lg shadow-yellow-500/20':''}`}
+                        className={`flex-1 py-4 rounded-xl font-black text-xl transition-all ${st.pts===v?'bg-accent text-black scale-105 shadow-lg shadow-yellow-500/20':''}`}
                         style={st.pts!==v?{background:'var(--card2)'}:{}}>{v}</button>
                 ))}
             </div>
@@ -882,7 +970,7 @@ const ptsPicker=(isR2||isR3)&&st.selCat&&!st.answered&&(
                     <input type="range" min="0" max="350" step="10" value={st.pts}
                         onChange={e=>dp({type:'SET_PTS',v:+e.target.value})}
                         className="flex-1 accent-yellow-400 h-3"/>
-                    <span className="text-accent font-black text-3xl w-16 text-center">{st.pts}</span>
+                    <span className="text-accent font-black text-4xl w-20 text-center">{st.pts}</span>
                 </div>
                 <div className="flex flex-wrap gap-1 mt-2">
                     {[0,50,100,150,200,250,300,350].map(v=>(
@@ -893,45 +981,45 @@ const ptsPicker=(isR2||isR3)&&st.selCat&&!st.answered&&(
                 </div>
             </div>
         )}
+        <Btn cls="mt-3 w-full bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 py-3 text-lg"
+            onClick={()=>{setPtsConfirmed(true);dp({type:'CONFIRM_PTS'})}}>
+            ▶ Potvrdiť a spustiť čas ({R2_TIMER}s)</Btn>
     </Card>
 );
 
 /* ── Question area ── */
-const questionArea=!isTB&&st.curQ&&(
+const questionArea=!isTB&&st.curQ&&(ptsConfirmed||isR1||st.tRun||st.answered||st.passing)&&(
     <Card cls="mt-3 anim-slide">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-                <span className="text-xl">{CAT_ICONS[st.curQ.category]||'❓'}</span>
-                <span className="text-accent text-sm font-bold uppercase tracking-wider">{CAT_LABELS[st.curQ.category]||st.curQ.category}</span>
+                <span className="text-2xl">{CAT_ICONS[st.curQ.category]||'❓'}</span>
+                <span className="text-accent text-base font-bold uppercase tracking-wider">{CAT_LABELS[st.curQ.category]||st.curQ.category}</span>
             </div>
-            {(isR2||isR3)&&<span className="text-accent font-black text-lg">{st.pts} b</span>}
+            {(isR2||isR3)&&<span className="text-accent font-black text-xl">{st.pts} b</span>}
         </div>
-        <p className="text-lg font-semibold mb-3 leading-relaxed">{st.curQ.question}</p>
+        <p className="text-xl font-semibold mb-4 leading-relaxed">{st.curQ.question}</p>
         <div className="rounded-xl p-3" style={{background:'var(--card2)'}}>
-            {st.revealed?<p className="text-ok font-bold text-lg">✓ {st.curQ.answer}</p>:
+            {st.revealed?<p className="text-ok font-bold text-xl">✓ {st.curQ.answer}</p>:
                 <button onClick={()=>dp({type:'REVEAL'})} style={{color:'var(--textSub)'}} className="hover:text-accent transition-colors text-sm">🔒 Zobraziť odpoveď</button>}
         </div>
     </Card>
 );
 
-/* ── Timer & controls (R2/R3) ── */
+/* ── Timer display (R2/R3) ── */
 const timerColor=st.tSec<=3?'text-red-400':st.tSec<=6?'text-yellow-400':'text-accent';
-const timerControls=!isR1&&!isTB&&st.curQ&&(
+const timerDisplay=(isR2||isR3)&&!isTB&&st.curQ&&(st.tRun||st.tSec<R2_TIMER||st.answered)&&(
     <div className="mt-3 flex items-center gap-3">
         <span className="text-sm" style={{color:'var(--textSub)'}}>Čas:</span>
-        <span className={`text-3xl font-black w-14 text-center ${timerColor}`}>{st.tSec}</span>
-        {!st.tRun?
-            <Btn cls="bg-ok/20 text-ok hover:bg-ok/30 text-sm py-1" onClick={()=>dp({type:'T_START'})} disabled={st.answered}>▶ Štart</Btn>:
-            <Btn cls="bg-red-500/20 text-red-400 hover:bg-red-500/30 text-sm py-1" onClick={()=>dp({type:'T_STOP'})}>⏸ Stop</Btn>
-        }
+        <span className={`text-4xl font-black w-14 text-center ${timerColor}`}>{st.tSec}</span>
+        {st.passing&&<span className="text-yellow-400 font-bold text-sm">⚡ ODPOVEĎ SUPER</span>}
     </div>
 );
 
-/* ── Next button ── */
-const nextBtn=!isTB&&(
+/* ── Next button (R2/R3) ── */
+const nextBtn=!isTB&&!isR1&&(
     <div className="mt-3 flex gap-2">
-        <Btn cls="bg-slate-600/30 hover:bg-slate-600/50 text-sm py-1" style={{color:'var(--textSub)'}} onClick={()=>dp({type:'NO_POINTS'})} disabled={st.answered}>⊘ Bez bodov</Btn>
-        <Btn cls="bg-accent/20 text-accent hover:bg-accent/30 text-sm py-1 flex-1" onClick={()=>dp({type:'NEXT_Q'})} disabled={!st.answered}>
+        <Btn cls="bg-slate-600/30 hover:bg-slate-600/50 text-sm py-2" style={{color:'var(--textSub)'}} onClick={()=>dp({type:'SKIP'})} disabled={st.answered}>⊘ Bez bodov</Btn>
+        <Btn cls="bg-accent/20 text-accent hover:bg-accent/30 text-sm py-2 flex-1" onClick={()=>dp({type:'NEXT_Q'})} disabled={!st.answered}>
             Ďalšia otázka →</Btn>
     </div>
 );
@@ -946,7 +1034,7 @@ const tbUI=isTB&&st.curQ&&(
         </div>
         <div className="rounded-xl p-4 border" style={{background:'var(--card2)',borderColor:'var(--border)'}}>
             <p className="text-xs mb-1" style={{color:'var(--textSub)'}}>{CAT_LABELS[st.curQ.category]||st.curQ.category}</p>
-            <p className="text-lg font-bold">{st.curQ.question}</p>
+            <p className="text-xl font-bold">{st.curQ.question}</p>
         </div>
         <div className="grid grid-cols-2 gap-4">
             <div>
@@ -978,7 +1066,7 @@ const dashboard=(
         {catPicker}
         {ptsPicker}
         {questionArea}
-        {timerControls}
+        {timerDisplay}
         {tbUI}
         {st.curQ&&nextBtn}
     </div>
@@ -1028,8 +1116,6 @@ const content=(
         <div className="text-7xl mb-4">🏆</div>
         <h2 className="text-xl mb-1" style={{color:'var(--textSub)'}}>Víťaz súťaže</h2>
         <h1 className={`text-5xl font-black ${wc} mb-6`}>{wn}!</h1>
-
-        {/* Score */}
         <div className="flex items-center justify-center gap-12 mb-8">
             <div className="text-center">
                 <div className="text-sm text-p1 font-semibold mb-1">🔵 {st.p1?.name}</div>
@@ -1041,8 +1127,6 @@ const content=(
                 <div className={`text-6xl font-black ${st.winner===2?'text-p2':'text-p2/50'}`}>{st.s2}</div>
             </div>
         </div>
-
-        {/* Stats table */}
         <Card cls="mb-6 w-full">
             <h3 className="text-lg font-bold text-accent mb-3 text-center">📊 Štatistiky súťaže</h3>
             <table className="w-full text-sm">
@@ -1057,36 +1141,18 @@ const content=(
                     {[{name:'1. Rýchla',k:'r1'},{name:'2. Hlavná',k:'r2'},{name:'3. Finálová',k:'r3'}].map(r=>(
                         <tr key={r.k} className="border-t" style={{borderColor:'var(--border)'}}>
                             <td className="py-2 font-semibold">{r.name}</td>
-                            <td className="py-2 text-center">
-                                <span className="text-green-400 font-bold">{ts[r.k].p1c}✓</span>
-                                {' '}
-                                <span className="text-red-400 font-bold">{ts[r.k].p1w}✗</span>
-                            </td>
-                            <td className="py-2 text-center">
-                                <span className="text-green-400 font-bold">{ts[r.k].p2c}✓</span>
-                                {' '}
-                                <span className="text-red-400 font-bold">{ts[r.k].p2w}✗</span>
-                            </td>
+                            <td className="py-2 text-center"><span className="text-green-400 font-bold">{ts[r.k].p1c}✓</span>{' '}<span className="text-red-400 font-bold">{ts[r.k].p1w}✗</span></td>
+                            <td className="py-2 text-center"><span className="text-green-400 font-bold">{ts[r.k].p2c}✓</span>{' '}<span className="text-red-400 font-bold">{ts[r.k].p2w}✗</span></td>
                         </tr>
                     ))}
                     <tr className="border-t-2 font-bold" style={{borderColor:'var(--border)'}}>
                         <td className="py-2">Celkovo</td>
-                        <td className="py-2 text-center">
-                            <span className="text-green-400">{p1tc}✓</span>
-                            {' '}
-                            <span className="text-red-400">{p1tw}✗</span>
-                        </td>
-                        <td className="py-2 text-center">
-                            <span className="text-green-400">{p2tc}✓</span>
-                            {' '}
-                            <span className="text-red-400">{p2tw}✗</span>
-                        </td>
+                        <td className="py-2 text-center"><span className="text-green-400">{p1tc}✓</span>{' '}<span className="text-red-400">{p1tw}✗</span></td>
+                        <td className="py-2 text-center"><span className="text-green-400">{p2tc}✓</span>{' '}<span className="text-red-400">{p2tw}✗</span></td>
                     </tr>
                 </tbody>
             </table>
         </Card>
-
-        {/* Actions */}
         <div className="flex gap-3 flex-wrap justify-center">
             {!saved?<Btn cls="bg-ok text-white hover:bg-green-600 py-3 px-6 shadow-lg shadow-green-500/20" onClick={doSave}>💾 Uložiť do tabuľky víťazov</Btn>
                 :<span className="text-ok font-bold py-3 px-6">✓ Uložené!</span>}
@@ -1186,7 +1252,6 @@ return(
 /* ════════════ SETTINGS ════════════ */
 function SettingsScreen(){
 const{st,dp}=use$();
-const[timer,setTimer]=useState(st.settings.timer);
 const[r2c,setR2]=useState(st.settings.r2count||10);
 const[r3c,setR3]=useState(st.settings.r3count||20);
 const isDark=(st.settings.theme||'dark')==='dark';
@@ -1195,7 +1260,6 @@ return(
     <button onClick={()=>dp({type:'NAV',to:'home'})} style={{color:'var(--textSub)'}} className="hover:text-accent mb-4">← Späť</button>
     <h2 className="text-3xl font-bold mb-6">⚙️ Nastavenia</h2>
     <Card cls="space-y-5">
-        {/* Theme toggle */}
         <div className="flex items-center justify-between">
             <div>
                 <span className="font-semibold">{isDark?'🌙 Tmavý režim':'☀️ Svetlý režim'}</span>
@@ -1206,17 +1270,13 @@ return(
                 <span className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow ${isDark?'left-1':'left-9'}`}/>
             </button>
         </div>
-
-        <div>
-            <label className="text-sm block mb-2" style={{color:'var(--textSub)'}}>Časovač na otázku (kolo 2 a 3)</label>
-            <div className="flex items-center gap-3">
-                <input type="range" min="5" max="30" value={timer} onChange={e=>setTimer(+e.target.value)} className="flex-1 accent-yellow-400"/>
-                <span className="text-accent font-bold w-10 text-center">{timer}s</span>
-            </div>
+        <div className="rounded-xl p-3 border" style={{background:'var(--card2)',borderColor:'var(--border)'}}>
+            <p className="font-semibold mb-1">Kolo 1 – Rýchla runda</p>
+            <p className="text-xs" style={{color:'var(--textSub)'}}>90 sekúnd na hráča · neobmedzený počet otázok · 10 bodov · bez odpočtu</p>
         </div>
-        <div>
-            <label className="text-sm block mb-2" style={{color:'var(--textSub)'}}>Kolo 1 – Rýchla runda</label>
-            <p className="text-xs" style={{color:'var(--textSub)'}}>10 ľahkých otázok na hráča · 10 bodov · bez odpočtu</p>
+        <div className="rounded-xl p-3 border" style={{background:'var(--card2)',borderColor:'var(--border)'}}>
+            <p className="font-semibold mb-1">Kolo 2 & 3 – Časovač</p>
+            <p className="text-xs" style={{color:'var(--textSub)'}}>10 sekúnd na otázku · automatický štart po výbere stávky</p>
         </div>
         <div>
             <label className="text-sm block mb-2" style={{color:'var(--textSub)'}}>Počet otázok v 2. kole (párne, 10–20)</label>
@@ -1238,7 +1298,7 @@ return(
                 ))}
             </div>
         </div>
-        <Btn cls="bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 w-full py-3" onClick={()=>dp({type:'UPD_SETTINGS',s:{timer,r2count:r2c,r3count:r3c}})}>Uložiť nastavenia</Btn>
+        <Btn cls="bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 w-full py-3" onClick={()=>dp({type:'UPD_SETTINGS',s:{r2count:r2c,r3count:r3c}})}>Uložiť nastavenia</Btn>
         <div className="flex items-center justify-between">
             <span>Zvukové efekty</span>
             <button onClick={()=>dp({type:'UPD_SETTINGS',s:{sound:!st.settings.sound}})}

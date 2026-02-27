@@ -23,14 +23,17 @@ body{font-family:'Inter',system-ui,sans-serif;overflow:hidden;cursor:none}
 @keyframes glow-pulse{0%,100%{filter:drop-shadow(0 0 5px rgba(234,179,8,.3))}50%{filter:drop-shadow(0 0 25px rgba(234,179,8,.6))}}
 @keyframes shine{0%{left:-100%}100%{left:200%}}
 @keyframes category-pop{0%{opacity:0;transform:scale(.7) translateY(20px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes super-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.7;transform:scale(1.1)}}
 .anim-slide{animation:slide-up .6s ease-out}
 .anim-pop{animation:scale-pop .5s ease-out}
 .anim-score{animation:score-flash .5s ease-out}
 .anim-pulse{animation:timer-pulse 1s ease-in-out infinite}
 .anim-float{animation:float 3s ease-in-out infinite}
 .anim-glow{animation:glow-pulse 2s ease-in-out infinite}
+.anim-super{animation:super-pulse 1s ease-in-out infinite}
 .confetti{position:fixed;width:12px;height:12px;border-radius:3px;animation:confetti-fall linear forwards;z-index:100}
 .timer-ring{transition:stroke-dashoffset .95s linear}
+.timeline-bar{transition:width .95s linear}
 .junior-bg{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460)}
 .standard-bg{background:linear-gradient(180deg,#0a0a1a,#0f172a,#0a0a1a)}
 .cat-card{animation:category-pop .4s ease-out both}
@@ -77,6 +80,7 @@ film:'from-red-500/20 to-red-600/5 border-red-500/50',
 matematika:'from-blue-500/20 to-blue-600/5 border-blue-500/50',
 historicke_podujatia:'from-orange-500/20 to-orange-600/5 border-orange-500/50',
 };
+const R1_TIME=90;
 
 /* ─── Helpers ─── */
 function goFullscreen(){
@@ -181,37 +185,38 @@ return(
 
     {/* Active player indicator */}
     <div className="text-center py-3">
-        <span className={`text-2xl font-bold ${d.active===1?'text-blue-400':'text-red-400'}`}>
+        <span className={`text-3xl font-bold ${d.active===1?'text-blue-400':'text-red-400'}`}>
             {d.active===1?'🔵':'🔴'} {d.active===1?d.p1?.name:d.p2?.name}
         </span>
-        <span className="text-slate-400 text-xl ml-3">vyberá okruh</span>
+        <span className="text-slate-400 text-2xl ml-3">vyberá okruh</span>
     </div>
 
     {/* Category grid */}
     <div className="flex-1 flex items-center justify-center px-8 pb-6">
+        {cats.length===0?<p className="text-accent text-3xl font-black py-8">Všetky okruhy boli použité!</p>:
         <div className="grid grid-cols-2 gap-4 max-w-3xl w-full">
             {cats.map((c,i)=>(
                 <div key={c}
-                    className={`cat-card p-5 rounded-2xl border-2 bg-gradient-to-br ${CAT_COLORS[c]||'from-slate-500/20 to-slate-600/5 border-slate-500/50'}`}
+                    className={`cat-card p-6 rounded-2xl border-2 bg-gradient-to-br ${CAT_COLORS[c]||'from-slate-500/20 to-slate-600/5 border-slate-500/50'}`}
                     style={{animationDelay:i*0.05+'s'}}>
                     <div className="flex items-center gap-4">
-                        <span className="text-4xl">{CAT_ICONS[c]||'❓'}</span>
-                        <span className="font-bold text-lg">{CAT_LABELS[c]||c}</span>
+                        <span className="text-5xl">{CAT_ICONS[c]||'❓'}</span>
+                        <span className="font-bold text-2xl">{CAT_LABELS[c]||c}</span>
                     </div>
                 </div>
             ))}
-        </div>
+        </div>}
     </div>
 
     {/* Score bar */}
     <div className="flex items-center justify-between px-6 py-3 bg-black/40">
         <div className="flex items-center gap-3">
-            <span className={`font-bold ${d.active===1?'text-blue-400':'text-slate-500'}`}>{d.p1?.name}</span>
-            <span className={`text-2xl font-black ${d.s1<0?'text-red-400':'text-blue-400'}`}>{d.s1}</span>
+            <span className={`font-bold text-lg ${d.active===1?'text-blue-400':'text-slate-500'}`}>{d.p1?.name}</span>
+            <span className={`text-3xl font-black ${d.s1<0?'text-red-400':'text-blue-400'}`}>{d.s1}</span>
         </div>
         <div className="flex items-center gap-3">
-            <span className={`text-2xl font-black ${d.s2<0?'text-red-400':'text-red-400'}`}>{d.s2}</span>
-            <span className={`font-bold ${d.active===2?'text-red-400':'text-slate-500'}`}>{d.p2?.name}</span>
+            <span className={`text-3xl font-black ${d.s2<0?'text-red-400':'text-red-400'}`}>{d.s2}</span>
+            <span className={`font-bold text-lg ${d.active===2?'text-red-400':'text-slate-500'}`}>{d.p2?.name}</span>
         </div>
     </div>
 </div>
@@ -230,7 +235,7 @@ return(
         {d.tbQ&&(
             <div className="anim-slide">
                 <div className="bg-black/50 border-2 border-accent/30 rounded-3xl p-8 mb-6">
-                    <p className="text-2xl font-bold leading-relaxed">{d.tbQ.question}</p>
+                    <p className="text-3xl font-bold leading-relaxed">{d.tbQ.question}</p>
                 </div>
                 {d.tbQ.answer&&(
                     <div className="anim-pop">
@@ -344,11 +349,19 @@ return(
 /* ═══════════════ GAME SCREEN (QUESTION VISIBLE) ═══════════════ */
 function GameScreen({d}){
 const isJunior=d.diff==='junior';
-const timerFrac=d.tDur>0?d.tSec/d.tDur:1;
+const isR1=d.round===1;
+const tDur=d.tDur||10;
+const timerFrac=tDur>0?d.tSec/tDur:1;
 const circ=2*Math.PI*54;
 const dashOff=circ*(1-timerFrac);
 const tCol=d.tSec<=3?'#ef4444':d.tSec<=6?'#eab308':'#22c55e';
-const isR1=d.round===1;
+
+/* R1 timer */
+const r1frac=(d.r1timer||0)/R1_TIME;
+const r1circ=2*Math.PI*54;
+const r1dashOff=r1circ*(1-r1frac);
+const r1Col=(d.r1timer||0)<=10?'#ef4444':(d.r1timer||0)<=20?'#eab308':'#22c55e';
+
 const [prevS1,setPrevS1]=useState(d.s1);
 const [prevS2,setPrevS2]=useState(d.s2);
 const [flashP1,setFlashP1]=useState(false);
@@ -363,6 +376,7 @@ const PlayerCard=({num,name,score,isActive,flash})=>(
     isActive?(num===1?'border-blue-500 bg-blue-950/60 shadow-lg shadow-blue-500/30':'border-red-500 bg-red-950/60 shadow-lg shadow-red-500/30')
     :'border-slate-800 bg-black/20'}`}>
     {isActive&&<span className={`text-xs font-bold uppercase tracking-widest mb-2 ${num===1?'text-blue-400':'text-red-400'} animate-pulse`}>● ODPOVEDÁ</span>}
+    {d.passing&&isActive&&<span className="text-xs font-bold text-yellow-400 uppercase tracking-widest mb-1 anim-super">⚡ SUPER</span>}
     <h3 className={`text-lg font-bold mb-2 ${isActive?'text-white':'text-slate-400'}`}>{name}</h3>
     <div className={`text-6xl font-black ${flash?'anim-score':''} ${score<0?'text-red-400':num===1?'text-blue-400':'text-red-400'}`}>{score}</div>
 </div>
@@ -377,8 +391,19 @@ return(
             <span className="text-slate-600">│</span>
             <span className="text-white font-semibold text-lg">{d.roundName||ROUND_NAMES[d.round]}</span>
         </div>
-        <span className="text-slate-400">Otázka {d.qNum}/{d.qTotal}</span>
+        <span className="text-slate-400">
+            {isR1?`${d.r1phase===1?d.p1?.name:d.p2?.name}`:`Otázka ${d.qNum}/${d.qTotal}`}
+        </span>
     </div>
+
+    {/* R1 timeline bar */}
+    {isR1&&d.r1tRun&&(
+        <div className="px-6 py-1 bg-black/20">
+            <div className="h-3 rounded-full overflow-hidden bg-slate-800">
+                <div className="h-full rounded-full timeline-bar" style={{width:((d.r1timer/R1_TIME)*100)+'%',background:r1Col}}/>
+            </div>
+        </div>
+    )}
 
     {/* Main area */}
     <div className="flex-1 flex items-center justify-between px-6 gap-6">
@@ -387,10 +412,23 @@ return(
 
         {/* Center */}
         <div className="flex-1 flex flex-col items-center justify-center max-w-xl gap-4">
-            {/* Timer (R2/R3 only) */}
-            {!isR1&&(d.tRun||d.tSec<d.tDur)&&(
+            {/* R1: 90s timer circle */}
+            {isR1&&d.r1tRun&&(
                 <div className="relative flex items-center justify-center">
-                    <svg width="110" height="110" viewBox="0 0 120 120" className={d.tRun&&d.tSec<=3?'anim-pulse':''}>
+                    <svg width="120" height="120" viewBox="0 0 120 120" className={(d.r1timer||0)<=10?'anim-pulse':''}>
+                        <circle cx="60" cy="60" r="54" fill="none" stroke="#1e293b" strokeWidth="5"/>
+                        <circle cx="60" cy="60" r="54" fill="none" stroke={r1Col} strokeWidth="5"
+                            strokeDasharray={r1circ} strokeDashoffset={r1dashOff} strokeLinecap="round"
+                            className="timer-ring" transform="rotate(-90 60 60)"/>
+                    </svg>
+                    <span className={`absolute text-4xl font-black ${(d.r1timer||0)<=10?'text-red-400':'text-white'}`}>{d.r1timer||0}</span>
+                </div>
+            )}
+
+            {/* R2/R3 Timer */}
+            {!isR1&&(d.tRun||d.tSec<tDur)&&(
+                <div className="relative flex items-center justify-center">
+                    <svg width="120" height="120" viewBox="0 0 120 120" className={d.tRun&&d.tSec<=3?'anim-pulse':''}>
                         <circle cx="60" cy="60" r="54" fill="none" stroke="#1e293b" strokeWidth="5"/>
                         <circle cx="60" cy="60" r="54" fill="none" stroke={tCol} strokeWidth="5"
                             strokeDasharray={circ} strokeDashoffset={dashOff} strokeLinecap="round"
@@ -401,24 +439,31 @@ return(
             )}
 
             {/* R1 info */}
-            {isR1&&<div className="text-center text-slate-400 text-lg">{d.r1phase===1?d.p1?.name:d.p2?.name} odpovedá · 10 bodov</div>}
+            {isR1&&<div className="text-center text-slate-400 text-xl">{d.r1phase===1?d.p1?.name:d.p2?.name} odpovedá · <span className="text-accent font-bold">10</span> bodov</div>}
 
-            {/* Points badge */}
+            {/* Passing indicator */}
+            {d.passing&&(
+                <div className="bg-yellow-500/20 border-2 border-yellow-500/50 rounded-xl px-6 py-2 anim-super">
+                    <span className="text-yellow-400 font-black text-xl">⚡ ODPOVEĎ SUPER</span>
+                </div>
+            )}
+
+            {/* Points badge (R2/R3) */}
             {!isR1&&d.q&&(
                 <div className="flex items-center gap-2">
-                    <span className="text-accent font-black text-3xl">{d.pts}</span>
-                    <span className="text-slate-400 text-sm">bodov</span>
+                    <span className="text-accent font-black text-4xl">{d.pts}</span>
+                    <span className="text-slate-400 text-lg">bodov</span>
                 </div>
             )}
 
             {/* Question */}
             {d.q?(
                 <div className="anim-slide text-center w-full">
-                    <span className={`text-xs font-semibold uppercase tracking-widest mb-2 block ${isJunior?'text-purple-400':'text-accent/70'}`}>
+                    <span className={`text-sm font-semibold uppercase tracking-widest mb-2 block ${isJunior?'text-purple-400':'text-accent/70'}`}>
                         {d.q.category}
                     </span>
                     <div className={`bg-black/50 border-2 ${isJunior?'border-purple-500/30':'border-accent/20'} rounded-2xl p-6`}>
-                        <p className="font-bold text-xl leading-relaxed">{d.q.question}</p>
+                        <p className="font-bold text-2xl leading-relaxed">{d.q.question}</p>
                     </div>
                 </div>
             ):<div className="text-slate-600 text-lg">Čakám na otázku…</div>}
@@ -427,7 +472,7 @@ return(
             {d.answer&&(
                 <div className="anim-pop">
                     <div className="bg-green-500/10 border-2 border-green-500/30 rounded-2xl px-6 py-3">
-                        <span className="text-green-400 font-bold text-xl">✓ {d.answer}</span>
+                        <span className="text-green-400 font-bold text-2xl">✓ {d.answer}</span>
                     </div>
                 </div>
             )}
@@ -439,7 +484,7 @@ return(
 
     {/* Bottom bar */}
     <div className="flex items-center justify-center px-6 py-2 bg-black/20">
-        <span className="text-slate-600 text-sm">DUEL v3</span>
+        <span className="text-slate-600 text-sm">DUEL v3.1</span>
     </div>
 </div>
 );
@@ -477,7 +522,7 @@ if(d.over)return <div onClick={handleClick}><ResultsScreen d={d}/></div>;
 if(d.round==='tiebreaker'&&d.tbQ)return <div onClick={handleClick}><TiebreakerScreen d={d}/></div>;
 
 /* Category grid (R2/R3 before category picked) */
-if((d.round===2||d.round===3)&&!d.selCat&&d.categories&&d.categories.length>0)
+if((d.round===2||d.round===3)&&!d.selCat&&d.categories)
     return <div onClick={handleClick}><CategoryGridScreen d={d}/></div>;
 
 /* Active game with question */
