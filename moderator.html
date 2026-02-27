@@ -206,14 +206,6 @@ if(n<=0){
 }
 return{...st,r1timer:n}
 }
-/* R1 question limit reached */
-case 'R1_Q_LIMIT':{
-if(st.r1phase===1){
-    const u2=new Set(st.usedIds),q=pickQ('junior',u2);if(q)u2.add(q.id);
-    return{...st,r1timer:R1_TIME,r1tRun:false,r1phase:2,r1qCount:0,active:2,curQ:q,usedIds:u2,answered:false,revealed:false,pts:10}
-}
-return{...st,r1timer:0,r1tRun:false,showRoundSummary:true,summaryRound:1,curQ:null,answered:false,revealed:false}
-}
 
 case 'SET_PTS':return{...st,pts:a.v};
 case 'REVEAL':return{...st,revealed:true};
@@ -380,15 +372,10 @@ useEffect(()=>{
 /* R1 auto-advance: when answered, auto-go to next question after 400ms */
 useEffect(()=>{
     if(st.round===1&&st.answered&&st.r1tRun){
-        const nextCount=st.r1qCount+1;
-        if(nextCount>=R1_MAX_Q){
-            autoAdvRef.current=setTimeout(()=>dp({type:'R1_Q_LIMIT'}),600);
-        }else{
-            autoAdvRef.current=setTimeout(()=>dp({type:'NEXT_Q'}),400);
-        }
+        autoAdvRef.current=setTimeout(()=>dp({type:'NEXT_Q'}),400);
         return()=>clearTimeout(autoAdvRef.current);
     }
-},[st.answered,st.round,st.r1tRun,st.r1qCount]);
+},[st.answered,st.round,st.r1tRun]);
 
 /* R2/R3 Timer */
 useEffect(()=>{
