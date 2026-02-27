@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DUEL – TV</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; margin: 0; overflow: hidden; cursor: none; }
+        html, body, #root { height: 100%; }
+
+        /* Animations */
+        @keyframes pulse-glow { 0%,100%{filter:brightness(1)} 50%{filter:brightness(1.3)} }
+        @keyframes slide-up { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes scale-pop { 0%{transform:scale(0.5);opacity:0} 60%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
+        @keyframes score-flash { 0%{transform:scale(1)} 25%{transform:scale(1.25)} 100%{transform:scale(1)} }
+        @keyframes timer-pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+        @keyframes confetti-fall {
+            0%{transform:translateY(-10vh) rotate(0deg);opacity:1}
+            100%{transform:translateY(110vh) rotate(720deg);opacity:0.3}
+        }
+        @keyframes float {
+            0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)}
+        }
+        @keyframes spin-slow { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
+        .anim-slide { animation: slide-up 0.5s ease-out; }
+        .anim-pop { animation: scale-pop 0.4s ease-out; }
+        .anim-score { animation: score-flash 0.5s ease-out; }
+        .anim-timer-pulse { animation: timer-pulse 1s ease-in-out infinite; }
+        .anim-float { animation: float 3s ease-in-out infinite; }
+
+        /* Timer ring */
+        .timer-ring { transition: stroke-dashoffset 0.95s linear; }
+
+        /* Confetti piece */
+        .confetti {
+            position: fixed; width: 10px; height: 10px; border-radius: 2px;
+            animation: confetti-fall linear forwards;
+        }
+
+        /* Junior theme extras */
+        .junior-bg {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        }
+        .standard-bg {
+            background: linear-gradient(180deg, #0a0a1a 0%, #0f172a 30%, #0a0a1a 100%);
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        bg: '#0a0a1a',
+                        card: '#1e293b',
+                        accent: '#eab308',
+                        gold: '#fbbf24',
+                        p1: '#3b82f6',
+                        p2: '#ef4444',
+                        ok: '#22c55e',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+// ================================================================
+//  DUEL – TV Display (React)
+// ================================================================
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ────────────── BROADCAST CHANNEL ──────────────
+const channel = new BroadcastChannel('duel-game');
+
+// ────────────── FULLSCREEN ──────────────
+function goFullscreen() {
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+}
+
+// ────────────── CONFETTI ──────────────
+function spawnConfetti(count = 80) {
+    const colors = ['#eab308','#3b82f6','#ef4444','#22c55e','#a855f7','#ec4899','#f97316','#06b6d4'];
+    const container = document.getElementById('confetti-container');
+    if (!container) return;
+    container.innerHTML = '';
+    for (let i = 0; i < count; i++) {
+        const el = document.createElement('div');
+        el.className = 'confetti';
+        el.style.left = Math.random() * 100 + 'vw';
+        el.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        el.style.animationDuration = (2 + Math.random() * 3) + 's';
+        el.style.animationDelay = Math.random() * 2 + 's';
+        el.style.width = (6 + Math.random() * 10) + 'px';
+        el.style.height = (6 + Math.random() * 10) + 'px';
+        el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+        container.appendChild(el);
+    }
+    setTimeout(() => { container.innerHTML = ''; }, 6000);
+}
+
+// ────────────── MAIN APP ──────────────
+function TVApp() {
+    const [data, setData] = useState(null);
+    const [mode, setMode] = useState('waiting'); // waiting | game | results
+    const [prevScores, setPrevScores] = useState({ s1: 0, s2: 0 });
+    const [scoreAnim, setScoreAnim] = useState({ p1: false, p2: false });
+    const prevScoresRef = useRef({ s1: 0, s2: 0 });
+
+    // Listen to moderator
+    useEffect(() => {
+        const handler = (e) => {
+            const msg = e.data;
+            if (msg.type === 'WAITING') {
+                setMode('waiting');
+                setData(null);
+            } else if (msg.type === 'UPDATE') {
+                const d = msg.data;
+                setData(d);
+                if (d.over) {
+                    setMode('results');
+                    setTimeout(() => spawnConfetti(120), 300);
+                } else if (d.screen === 'results') {
+                    setMode('results');
+                    setTimeout(() => spawnConfetti(120), 300);
+                } else {
+                    setMode('game');
+                }
+                // Score change animations
+                const prev = prevScoresRef.current;
+                if (d.s1 !== prev.s1) {
+                    setScoreAnim(a => ({ ...a, p1: true }));
+                    setTimeout(() => setScoreAnim(a => ({ ...a, p1: false })), 500);
+                }
+                if (d.s2 !== prev.s2) {
+                    setScoreAnim(a => ({ ...a, p2: true }));
+                    setTimeout(() => setScoreAnim(a => ({ ...a, p2: false })), 500);
+                }
+                prevScoresRef.current = { s1: d.s1, s2: d.s2 };
+            }
+        };
+        channel.addEventListener('message', handler);
+        return () => channel.removeEventListener('message', handler);
+    }, []);
+
+    // Fullscreen on click
+    useEffect(() => {
+        const handler = () => goFullscreen();
+        document.addEventListener('click', handler, { once: false });
+        return () => document.removeEventListener('click', handler);
+    }, []);
+
+    const isJunior = data?.diff === 'junior';
+    const bgClass = isJunior ? 'junior-bg' : 'standard-bg';
+
+    if (mode === 'waiting' || !data) return <WaitingScreen />;
+    if (mode === 'results') return <ResultsScreen data={data} isJunior={isJunior} />;
+    return <GameScreen data={data} scoreAnim={scoreAnim} isJunior={isJunior} />;
+}
+
+// ════════════ WAITING SCREEN ════════════
+function WaitingScreen() {
+    return (
+        <div className="h-full flex flex-col items-center justify-center standard-bg">
+            <div className="anim-float">
+                <h1 className="text-9xl font-black text-accent tracking-tight mb-4"
+                    style={{ textShadow: '0 0 60px rgba(234,179,8,0.4), 0 0 120px rgba(234,179,8,0.1)' }}>
+                    DUEL
+                </h1>
+            </div>
+            <p className="text-2xl text-slate-400 mt-6">Vedomostná súťaž</p>
+            <p className="text-slate-600 mt-8 text-sm">Čakám na moderátora…</p>
+            <p className="text-slate-700 mt-2 text-xs">Klikni pre celú obrazovku</p>
+        </div>
+    );
+}
+
+// ════════════ GAME SCREEN ════════════
+function GameScreen({ data, scoreAnim, isJunior }) {
+    const { p1, p2, s1, s2, round, roundName, qNum, q, answer, active, tRun, tSec, tDur, pts, diff, answered } = data;
+
+    // Timer circle
+    const timerFrac = tDur > 0 ? tSec / tDur : 1;
+    const circumference = 2 * Math.PI * 54;
+    const dashOffset = circumference * (1 - timerFrac);
+    const timerColor = tSec <= 3 ? '#ef4444' : tSec <= 6 ? '#eab308' : '#22c55e';
+
+    return (
+        <div className={`h-full flex flex-col ${isJunior ? 'junior-bg' : 'standard-bg'}`}>
+            {/* Top bar */}
+            <div className="flex items-center justify-between px-8 py-3 bg-black/30">
+                <div className="flex items-center gap-3">
+                    <span className="text-accent font-black text-xl">DUEL</span>
+                    <span className="text-slate-500">│</span>
+                    <span className="text-slate-300 text-sm">{roundName}</span>
+                </div>
+                <div className="text-slate-400 text-sm">
+                    Otázka {qNum}/5
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        isJunior ? 'bg-purple-600/30 text-purple-300' :
+                        diff === 'level1' ? 'bg-blue-600/30 text-blue-300' :
+                        'bg-red-600/30 text-red-300'}`}>
+                        {diff === 'junior' ? '⭐ Junior' : diff === 'level1' ? '🔥 Level 1' : '💀 Level 2'}
+                    </span>
+                </div>
+            </div>
+
+            {/* Main content */}
+            <div className="flex-1 flex items-center justify-between px-8 py-4 gap-8">
+                {/* Player 1 */}
+                <PlayerCard name={p1?.name} score={s1} num={1} isActive={active === 1} animating={scoreAnim.p1} isJunior={isJunior} />
+
+                {/* Center: Question + Timer */}
+                <div className="flex-1 flex flex-col items-center justify-center max-w-2xl gap-6">
+                    {/* Timer */}
+                    {tRun || tSec < tDur ? (
+                        <div className="relative flex items-center justify-center">
+                            <svg width="130" height="130" viewBox="0 0 120 120" className={tRun && tSec <= 3 ? 'anim-timer-pulse' : ''}>
+                                <circle cx="60" cy="60" r="54" fill="none" stroke="#1e293b" strokeWidth="6" />
+                                <circle cx="60" cy="60" r="54" fill="none" stroke={timerColor} strokeWidth="6"
+                                    strokeDasharray={circumference} strokeDashoffset={dashOffset}
+                                    strokeLinecap="round" className="timer-ring"
+                                    transform="rotate(-90 60 60)" />
+                            </svg>
+                            <span className={`absolute text-5xl font-black ${tSec <= 3 ? 'text-red-400' : 'text-white'}`}>
+                                {tSec}
+                            </span>
+                        </div>
+                    ) : null}
+
+                    {/* Point value */}
+                    <div className="flex items-center gap-2">
+                        <span className="text-accent font-black text-3xl">{pts}</span>
+                        <span className="text-slate-400 text-lg">bodov</span>
+                    </div>
+
+                    {/* Question */}
+                    {q ? (
+                        <div className="anim-slide text-center w-full">
+                            <span className={`text-xs font-semibold uppercase tracking-widest mb-3 block ${
+                                isJunior ? 'text-purple-400' : 'text-accent/70'}`}>
+                                {q.category}
+                            </span>
+                            <div className={`bg-black/40 backdrop-blur-sm border ${
+                                isJunior ? 'border-purple-500/30' : 'border-accent/20'
+                            } rounded-2xl p-8`}>
+                                <p className={`font-bold leading-relaxed ${
+                                    isJunior ? 'text-3xl' : 'text-2xl'}`}>
+                                    {q.question}
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-slate-600 text-xl">Čakám na otázku…</div>
+                    )}
+
+                    {/* Answer reveal */}
+                    {answer && (
+                        <div className="anim-pop">
+                            <div className={`bg-ok/10 border border-ok/30 rounded-xl px-8 py-4 ${
+                                isJunior ? 'text-2xl' : 'text-xl'}`}>
+                                <span className="text-ok font-bold">✓ {answer}</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Player 2 */}
+                <PlayerCard name={p2?.name} score={s2} num={2} isActive={active === 2} animating={scoreAnim.p2} isJunior={isJunior} />
+            </div>
+
+            <div id="confetti-container" className="fixed inset-0 pointer-events-none z-50"></div>
+        </div>
+    );
+}
+
+// ── Player Card ──
+function PlayerCard({ name, score, num, isActive, animating, isJunior }) {
+    const color = num === 1 ? 'p1' : 'p2';
+    const borderColor = num === 1 ? 'border-p1' : 'border-p2';
+    const glowColor = num === 1 ? 'shadow-blue-500/30' : 'shadow-red-500/30';
+    const bgActive = num === 1 ? 'from-blue-950/80 to-blue-950/20' : 'from-red-950/80 to-red-950/20';
+
+    return (
+        <div className={`w-56 rounded-2xl border-2 p-6 transition-all duration-500 ${
+            isActive
+                ? `${borderColor} bg-gradient-to-b ${bgActive} shadow-xl ${glowColor}`
+                : 'border-slate-800 bg-black/20'
+        }`}>
+            {/* Active indicator */}
+            {isActive && (
+                <div className={`text-center mb-3`}>
+                    <span className={`text-xs font-bold uppercase tracking-widest ${
+                        num === 1 ? 'text-p1' : 'text-p2'} animate-pulse`}>
+                        ● ODPOVEDÁ
+                    </span>
+                </div>
+            )}
+
+            {/* Name */}
+            <div className="text-center mb-4">
+                <div className={`w-3 h-3 rounded-full mx-auto mb-2 ${num === 1 ? 'bg-p1' : 'bg-p2'}`} />
+                <h3 className={`text-2xl font-bold ${isActive ? 'text-white' : 'text-slate-400'}`}>
+                    {name}
+                </h3>
+            </div>
+
+            {/* Score */}
+            <div className={`text-center ${animating ? 'anim-score' : ''}`}>
+                <div className={`text-6xl font-black ${
+                    score < 0 ? 'text-red-400' :
+                    isActive ? (num === 1 ? 'text-p1' : 'text-p2') : 'text-slate-500'
+                }`} style={isActive && !isJunior ? { textShadow: `0 0 30px ${num === 1 ? 'rgba(59,130,246,0.4)' : 'rgba(239,68,68,0.4)'}` } : {}}>
+                    {score}
+                </div>
+                <div className="text-xs text-slate-600 mt-1 uppercase tracking-widest">bodov</div>
+            </div>
+        </div>
+    );
+}
+
+// ════════════ RESULTS SCREEN ════════════
+function ResultsScreen({ data, isJunior }) {
+    const { p1, p2, s1, s2, winner } = data;
+    const winnerName = winner === 1 ? p1?.name : p2?.name;
+    const winnerColor = winner === 1 ? 'text-p1' : 'text-p2';
+
+    return (
+        <div className={`h-full flex flex-col items-center justify-center ${isJunior ? 'junior-bg' : 'standard-bg'}`}>
+            <div id="confetti-container" className="fixed inset-0 pointer-events-none z-50"></div>
+
+            <div className="anim-pop text-center z-10">
+                <div className={`text-8xl mb-6 ${isJunior ? 'anim-float' : ''}`}>🏆</div>
+                <h2 className="text-3xl text-slate-400 font-semibold mb-2">Víťaz</h2>
+                <h1 className={`text-7xl font-black ${winnerColor} mb-8`}
+                    style={{ textShadow: `0 0 40px ${winner === 1 ? 'rgba(59,130,246,0.5)' : 'rgba(239,68,68,0.5)'}` }}>
+                    {winnerName}
+                </h1>
+
+                <div className="flex items-center justify-center gap-12">
+                    <div className="text-center">
+                        <div className={`text-sm mb-1 ${winner === 1 ? 'text-accent' : 'text-slate-500'}`}>{p1?.name}</div>
+                        <div className={`text-7xl font-black ${winner === 1 ? 'text-p1' : 'text-slate-600'}`}>{s1}</div>
+                    </div>
+                    <div className="text-5xl text-slate-700 font-bold">:</div>
+                    <div className="text-center">
+                        <div className={`text-sm mb-1 ${winner === 2 ? 'text-accent' : 'text-slate-500'}`}>{p2?.name}</div>
+                        <div className={`text-7xl font-black ${winner === 2 ? 'text-p2' : 'text-slate-600'}`}>{s2}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ════════════ RENDER ════════════
+ReactDOM.createRoot(document.getElementById('root')).render(<TVApp />);
+    </script>
+</body>
+</html>
