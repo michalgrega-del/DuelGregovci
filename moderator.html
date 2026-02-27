@@ -3,280 +3,362 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DUEL – Moderátor</title>
+    <title>DUEL – Moderátor v2</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="questions.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', system-ui, sans-serif; margin: 0; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #1e293b; }
-        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        body{font-family:'Inter',system-ui,sans-serif;margin:0}
+        ::-webkit-scrollbar{width:6px}
+        ::-webkit-scrollbar-track{background:#1e293b}
+        ::-webkit-scrollbar-thumb{background:#475569;border-radius:3px}
+        .timeline-bar{transition:width 0.95s linear}
+        @keyframes pulse-glow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.3)}}
+        @keyframes slide-up{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes scale-pop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+        @keyframes score-flash{0%{transform:scale(1)}25%{transform:scale(1.25)}100%{transform:scale(1)}}
+        @keyframes timer-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+        @keyframes confetti-fall{0%{transform:translateY(-10vh) rotate(0deg);opacity:1}100%{transform:translateY(110vh) rotate(720deg);opacity:.3}}
+        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+        .anim-slide{animation:slide-up .5s ease-out}
+        .anim-pop{animation:scale-pop .4s ease-out}
+        .anim-score{animation:score-flash .5s ease-out}
+        .anim-timer-pulse{animation:timer-pulse 1s ease-in-out infinite}
+        .anim-float{animation:float 3s ease-in-out infinite}
+        .timer-ring{transition:stroke-dashoffset .95s linear}
+        .confetti{position:fixed;width:10px;height:10px;border-radius:2px;animation:confetti-fall linear forwards}
+        .junior-bg{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)}
+        .standard-bg{background:linear-gradient(180deg,#0a0a1a 0%,#0f172a 30%,#0a0a1a 100%)}
     </style>
     <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        bg: '#0f172a',
-                        card: '#1e293b',
-                        card2: '#334155',
-                        accent: '#eab308',
-                        p1: '#3b82f6',
-                        p2: '#ef4444',
-                        ok: '#22c55e',
-                        err: '#ef4444',
-                    }
-                }
-            }
-        }
+        tailwind.config={theme:{extend:{colors:{
+            bg:'#0f172a',card:'#1e293b',card2:'#334155',
+            accent:'#eab308',p1:'#3b82f6',p2:'#ef4444',ok:'#22c55e',err:'#ef4444',
+        }}}}
     </script>
 </head>
 <body class="bg-bg text-white min-h-screen">
-    <div id="root"></div>
-
-    <script type="text/babel">
+<div id="root"></div>
+<script type="text/babel">
 // ================================================================
-//  DUEL – Moderátor (React SPA)
+//  DUEL v2 – Moderátor (React SPA)
 // ================================================================
-const { useState, useReducer, useContext, createContext, useEffect, useRef, useCallback, useMemo } = React;
+const {useState,useReducer,useContext,createContext,useEffect,useRef,useCallback,useMemo}=React;
 
-// ────────────── CONSTANTS ──────────────
-const ROUND_NAMES = { 1:'Rýchla runda', 2:'Striedavá runda', 3:'Súperova voľba', tiebreaker:'Rozstrel' };
-const DIFF_LABELS = { junior:'Junior (7–12)', level1:'Level 1 (13–18)', level2:'Level 2 (18–99)' };
-const CAT_LABELS = {
-    dejiny:'Dejiny', veda:'Veda', sport:'Šport', kultura:'Kultúra', literatura:'Literatúra',
-    osobnosti:'Osobnosti', priroda:'Príroda', stroje:'Stroje & Technika',
-    doplnovacky:'Doplňovačky', presmycky:'Presmyčky', hudba:'Hudba', film:'Film',
-    matematika:'Matematika', historicke_podujatia:'Historické udalosti'
+/* ─── CONSTANTS ─── */
+const ROUND_NAMES={1:'Rýchla runda',2:'Striedavá runda',3:'Súperova voľba',tiebreaker:'Rozstrel'};
+const DIFF_LABELS={junior:'Junior (7–12)',level1:'Level 1 (13–18)',level2:'Level 2 (18–99)'};
+const CAT_LABELS={
+    dejiny:'Dejiny',veda:'Veda',sport:'Šport',kultura:'Kultúra',literatura:'Literatúra',
+    osobnosti:'Osobnosti',priroda:'Príroda',stroje:'Stroje & Technika',
+    doplnovacky:'Doplňovačky',presmycky:'Presmyčky',hudba:'Hudba',film:'Film',
+    matematika:'Matematika',historicke_podujatia:'Historické udalosti'
 };
-const PTS = [10, 20, 30, 40, 50];
+const R3_PTS=Array.from({length:36},(_,i)=>i*10);   // 0,10,20…350
+const R12_PTS=[10,20,30,40,50];
+const R1_TOTAL_SEC=90;
+const R1_Q_PER_PLAYER=10;
 
-// ────────────── STORAGE ──────────────
-const S = {
-    g(k, d=null){ try{ const v=localStorage.getItem('duel_'+k); return v?JSON.parse(v):d; }catch{return d;} },
-    s(k, v){ try{ localStorage.setItem('duel_'+k,JSON.stringify(v)); }catch(e){console.warn(e);} }
+/* ─── STORAGE ─── */
+const S={
+    g(k,d=null){try{const v=localStorage.getItem('duel_'+k);return v?JSON.parse(v):d}catch{return d}},
+    s(k,v){try{localStorage.setItem('duel_'+k,JSON.stringify(v))}catch(e){console.warn(e)}}
 };
 
-// ────────────── AUDIO (Web Audio API) ──────────────
-const SFX = (()=>{
+/* ─── AUDIO ─── */
+const SFX=(()=>{
     let c=null;
-    const i=()=>{ if(!c) c=new(window.AudioContext||window.webkitAudioContext)(); if(c.state==='suspended')c.resume(); return c; };
-    const osc=(freq,type,dur,vol=0.15,t=0)=>{
-        const x=i(), o=x.createOscillator(), g=x.createGain();
-        o.connect(g); g.connect(x.destination);
-        o.type=type; o.frequency.value=freq;
-        g.gain.setValueAtTime(vol, x.currentTime+t);
-        g.gain.exponentialRampToValueAtTime(0.001, x.currentTime+t+dur);
-        o.start(x.currentTime+t); o.stop(x.currentTime+t+dur);
+    const i=()=>{if(!c)c=new(window.AudioContext||window.webkitAudioContext)();if(c.state==='suspended')c.resume();return c};
+    const osc=(freq,type,dur,vol=.15,t=0)=>{
+        const x=i(),o=x.createOscillator(),g=x.createGain();
+        o.connect(g);g.connect(x.destination);o.type=type;o.frequency.value=freq;
+        g.gain.setValueAtTime(vol,x.currentTime+t);
+        g.gain.exponentialRampToValueAtTime(.001,x.currentTime+t+dur);
+        o.start(x.currentTime+t);o.stop(x.currentTime+t+dur);
     };
-    return {
-        enabled: true,
-        tick(){ if(!this.enabled)return; osc(880,'sine',0.06,0.12); },
-        tickLow(){ if(!this.enabled)return; osc(440,'sine',0.12,0.25); },
-        buzzer(){ if(!this.enabled)return; osc(120,'sawtooth',0.8,0.35); },
-        correct(){ if(!this.enabled)return; [523,659,784].forEach((f,i)=>osc(f,'sine',0.25,0.18,i*0.1)); },
-        wrong(){ if(!this.enabled)return; const x=i(),o=x.createOscillator(),g=x.createGain();
+    return{
+        enabled:true,
+        tick(){if(!this.enabled)return;osc(880,'sine',.06,.12)},
+        tickLow(){if(!this.enabled)return;osc(440,'sine',.12,.25)},
+        buzzer(){if(!this.enabled)return;osc(120,'sawtooth',.8,.35)},
+        correct(){if(!this.enabled)return;[523,659,784].forEach((f,i)=>osc(f,'sine',.25,.18,i*.1))},
+        wrong(){if(!this.enabled)return;const x=i(),o=x.createOscillator(),g=x.createGain();
             o.connect(g);g.connect(x.destination);o.type='square';o.frequency.value=200;
-            g.gain.setValueAtTime(0.2,x.currentTime);o.frequency.linearRampToValueAtTime(80,x.currentTime+0.35);
-            g.gain.exponentialRampToValueAtTime(0.001,x.currentTime+0.4);o.start();o.stop(x.currentTime+0.4); },
-        fanfare(){ if(!this.enabled)return; [392,494,587,784,1047].forEach((f,i)=>osc(f,'triangle',0.45,0.2,i*0.13)); },
+            g.gain.setValueAtTime(.2,x.currentTime);o.frequency.linearRampToValueAtTime(80,x.currentTime+.35);
+            g.gain.exponentialRampToValueAtTime(.001,x.currentTime+.4);o.start();o.stop(x.currentTime+.4)},
+        fanfare(){if(!this.enabled)return;[392,494,587,784,1047].forEach((f,i)=>osc(f,'triangle',.45,.2,i*.13))},
     };
 })();
 
-// ────────────── BROADCAST ──────────────
-const tvCh = new BroadcastChannel('duel-game');
-const sendTV = (type, data) => tvCh.postMessage({type, data});
+/* ─── BROADCAST ─── */
+const tvCh=new BroadcastChannel('duel-game');
+const sendTV=(type,data)=>tvCh.postMessage({type,data});
 
-// ────────────── QUESTION HELPERS ──────────────
-function pickQ(diff, usedIds, cat=null, type=null){
-    let pool = QUESTIONS_DB.filter(q =>
-        q.difficulty===diff && !usedIds.has(q.id) &&
-        (cat?q.category===cat:true) && (type?q.type===type:q.type!=='tiebreaker'));
-    if(!pool.length) pool = QUESTIONS_DB.filter(q =>
-        q.difficulty===diff && (cat?q.category===cat:true) && (type?q.type===type:q.type!=='tiebreaker'));
-    return pool.length ? pool[Math.floor(Math.random()*pool.length)] : null;
+/* ─── QUESTION HELPERS ─── */
+function getRecentUsedIds(){
+    const hist=S.g('history',[]);
+    const recent=hist.slice(-10);
+    const ids=new Set();
+    recent.forEach(h=>{if(h.usedQIds)h.usedQIds.forEach(id=>ids.add(id))});
+    return ids;
+}
+function pickQ(diff,usedIds,cat=null,type=null){
+    let pool=QUESTIONS_DB.filter(q=>q.difficulty===diff&&!usedIds.has(q.id)&&(cat?q.category===cat:true)&&(type?q.type===type:q.type!=='tiebreaker'));
+    if(!pool.length)pool=QUESTIONS_DB.filter(q=>q.difficulty===diff&&(cat?q.category===cat:true)&&(type?q.type===type:q.type!=='tiebreaker'));
+    return pool.length?pool[Math.floor(Math.random()*pool.length)]:null;
 }
 function getCats(diff){
-    const s=new Set(); QUESTIONS_DB.filter(q=>q.difficulty===diff&&q.type!=='tiebreaker').forEach(q=>s.add(q.category)); return [...s];
+    const s=new Set();QUESTIONS_DB.filter(q=>q.difficulty===diff&&q.type!=='tiebreaker').forEach(q=>s.add(q.category));return[...s];
 }
 
-// ────────────── REDUCER ──────────────
-const init = {
-    screen:'home', players:S.g('players',[]), history:S.g('history',[]),
-    settings:S.g('settings',{timer:10,sound:true}),
-    // setup
-    gameDate:new Date().toISOString().slice(0,10), p1:null, p2:null, diff:'junior',
-    // active game
-    round:1, qNum:0, curQ:null, usedIds:new Set(),
-    s1:0, s2:0, active:1, tRun:false, tSec:10,
-    pts:10, passed:false, revealed:false, answered:false,
-    gameOn:false, over:false, winner:null, selCat:null,
-    tb1:'', tb2:'',
+/* ═══════════════ REDUCER ═══════════════ */
+const init={
+    screen:'home',players:S.g('players',[]),history:S.g('history',[]),
+    settings:S.g('settings',{timer:10,sound:true,r2count:10,r3count:20}),
+    testMode:false,
+    gameDate:new Date().toISOString().slice(0,10),p1:null,p2:null,diff:'junior',
+    round:1,qNum:0,curQ:null,usedIds:new Set(),
+    s1:0,s2:0,active:1,tRun:false,tSec:10,
+    pts:10,passed:false,revealed:false,answered:false,
+    gameOn:false,over:false,winner:null,selCat:null,
+    tb1:'',tb2:'',
+    r1timer:R1_TOTAL_SEC,r1phase:1,r1qCount:0,
+    r3pts:0,
 };
 
-function reducer(st, a){
+function reducer(st,a){
+    const r2c=st.settings.r2count||10;
+    const r3c=st.settings.r3count||20;
     switch(a.type){
-    case 'NAV': return {...st, screen:a.to};
-    // ── Players ──
-    case 'ADD_P':{
-        const ps=[...st.players,{id:Date.now(),name:a.name,age:a.age,ts:new Date().toISOString()}];
-        S.s('players',ps); return {...st,players:ps}; }
-    case 'EDIT_P':{
-        const ps=st.players.map(p=>p.id===a.id?{...p,name:a.name,age:a.age}:p);
-        S.s('players',ps); return {...st,players:ps}; }
-    case 'DEL_P':{
-        const ps=st.players.filter(p=>p.id!==a.id);
-        S.s('players',ps); return {...st,players:ps}; }
-    // ── Setup ──
-    case 'SETUP': return {...st,...a.d};
-    // ── Start Game ──
+    case 'NAV': return{...st,screen:a.to};
+    case 'SET_TEST': return{...st,testMode:a.v};
+    /* Players */
+    case 'ADD_P':{const ps=[...st.players,{id:Date.now(),name:a.name,age:a.age,ts:new Date().toISOString()}];S.s('players',ps);return{...st,players:ps}}
+    case 'EDIT_P':{const ps=st.players.map(p=>p.id===a.id?{...p,name:a.name,age:a.age}:p);S.s('players',ps);return{...st,players:ps}}
+    case 'DEL_P':{const ps=st.players.filter(p=>p.id!==a.id);S.s('players',ps);return{...st,players:ps}}
+    /* Setup */
+    case 'SETUP': return{...st,...a.d};
+    /* Start */
     case 'START_GAME':{
-        const u=new Set(), q=pickQ(st.diff,u); if(q) u.add(q.id);
-        return {...st, screen:'game',gameOn:true,over:false,round:1,qNum:0,curQ:q,
-            usedIds:u,s1:0,s2:0,active:1,tRun:false,tSec:st.settings.timer,
-            pts:10,passed:false,revealed:false,answered:false,winner:null,selCat:null,tb1:'',tb2:''}; }
-    // ── Game Controls ──
-    case 'SET_ACTIVE': return {...st,active:a.p};
-    case 'SET_PTS': return {...st,pts:a.v};
-    case 'T_START': return {...st,tRun:true,tSec:st.settings.timer};
-    case 'T_TICK':{ const n=st.tSec-1; return n<=0?{...st,tSec:0,tRun:false}:{...st,tSec:n}; }
-    case 'T_STOP': return {...st,tRun:false};
-    case 'REVEAL': return {...st,revealed:true};
+        const recentIds=getRecentUsedIds();
+        const u=new Set(recentIds);
+        const q=pickQ(st.diff,u);if(q)u.add(q.id);
+        return{...st,screen:'game',gameOn:true,over:false,
+            round:1,qNum:0,curQ:q,usedIds:u,
+            s1:0,s2:0,active:1,tRun:false,tSec:st.settings.timer,
+            pts:10,passed:false,revealed:false,answered:false,
+            winner:null,selCat:null,tb1:'',tb2:'',
+            r1timer:R1_TOTAL_SEC,r1phase:1,r1qCount:0,r3pts:0}}
+    case 'SET_ACTIVE': return{...st,active:a.p};
+    case 'SET_PTS': return{...st,pts:a.v};
+    case 'SET_R3PTS': return{...st,r3pts:a.v,pts:a.v};
+    /* R1 Tick */
+    case 'R1_TICK':{
+        const n=st.r1timer-1;
+        if(n<=0){
+            if(st.r1phase===1){
+                const u2=new Set(st.usedIds),q=pickQ(st.diff,u2);if(q)u2.add(q.id);
+                return{...st,r1timer:R1_TOTAL_SEC,r1phase:2,r1qCount:0,active:2,
+                    curQ:q,usedIds:u2,tRun:false,answered:false,revealed:false,passed:false,pts:10}
+            }
+            const u2=new Set(st.usedIds),q=pickQ(st.diff,u2);if(q)u2.add(q.id);
+            return{...st,round:2,qNum:0,curQ:q,usedIds:u2,active:1,
+                tRun:false,tSec:st.settings.timer,r1timer:0,
+                pts:10,passed:false,revealed:false,answered:false,selCat:null}
+        }
+        return{...st,r1timer:n};
+    }
+    case 'R1_SKIP_PLAYER':{
+        if(st.r1phase===1){
+            const u2=new Set(st.usedIds),q=pickQ(st.diff,u2);if(q)u2.add(q.id);
+            return{...st,r1timer:R1_TOTAL_SEC,r1phase:2,r1qCount:0,active:2,
+                curQ:q,usedIds:u2,tRun:false,answered:false,revealed:false,passed:false,pts:10}
+        }
+        const u2=new Set(st.usedIds),q=pickQ(st.diff,u2);if(q)u2.add(q.id);
+        return{...st,round:2,qNum:0,curQ:q,usedIds:u2,active:1,
+            tRun:false,tSec:st.settings.timer,r1timer:0,
+            pts:10,passed:false,revealed:false,answered:false,selCat:null}
+    }
+    /* Timer R2/R3 */
+    case 'T_START':
+        if(st.round===1)return{...st,tRun:true};
+        return{...st,tRun:true,tSec:st.settings.timer};
+    case 'T_TICK':{const n=st.tSec-1;return n<=0?{...st,tSec:0,tRun:false}:{...st,tSec:n}}
+    case 'T_STOP': return{...st,tRun:false};
+    case 'REVEAL': return{...st,revealed:true};
+    /* Score */
     case 'CORRECT':{
-        const p=a.p||st.active;
-        return {...st, s1:p===1?st.s1+st.pts:st.s1, s2:p===2?st.s2+st.pts:st.s2,
-            answered:true, tRun:false}; }
+        const p=a.p||st.active;const ptsVal=st.round===3?st.r3pts:st.pts;
+        return{...st,s1:p===1?st.s1+ptsVal:st.s1,s2:p===2?st.s2+ptsVal:st.s2,
+            answered:true,tRun:st.round===1}}
     case 'WRONG':{
-        const p=a.p||st.active;
-        return {...st, s1:p===1?st.s1-st.pts:st.s1, s2:p===2?st.s2-st.pts:st.s2,
-            tRun:false, passed:false}; }
+        const p=a.p||st.active;const ptsVal=st.round===3?st.r3pts:st.pts;
+        return{...st,s1:p===1?st.s1-ptsVal:st.s1,s2:p===2?st.s2-ptsVal:st.s2,
+            tRun:st.round===1,passed:false,answered:st.round!==1}}
     case 'PASS':
-        return {...st, active:st.active===1?2:1, passed:true, tSec:st.settings.timer};
+        return{...st,active:st.active===1?2:1,passed:true,tSec:st.settings.timer};
     case 'NO_POINTS':
-        return {...st, answered:true, tRun:false};
-    // ── Next Question / Round ──
+        return{...st,answered:true,tRun:st.round===1};
+    /* Next Q / Round */
     case 'NEXT_Q':{
-        const nq=st.qNum+1;
-        if(nq>=5){ // round over
-            const nr=st.round<3?st.round+1:'done';
-            if(nr==='done'){
-                if(st.s1===st.s2){ // tiebreaker
-                    const u2=new Set(st.usedIds), q=pickQ(st.diff,u2,null,'tiebreaker'); if(q)u2.add(q.id);
-                    return {...st,round:'tiebreaker',qNum:0,curQ:q,usedIds:u2,active:1,tRun:false,
-                        tSec:st.settings.timer,pts:10,passed:false,revealed:false,answered:false,selCat:null,tb1:'',tb2:''};
+        /* ── Round 1 ── */
+        if(st.round===1){
+            const nc=st.r1qCount+1;
+            if(nc>=R1_Q_PER_PLAYER||st.r1timer<=0){
+                if(st.r1phase===1){
+                    const u2=new Set(st.usedIds),q=pickQ(st.diff,u2);if(q)u2.add(q.id);
+                    return{...st,r1phase:2,r1qCount:0,r1timer:R1_TOTAL_SEC,active:2,
+                        curQ:q,usedIds:u2,answered:false,revealed:false,passed:false,pts:10,tRun:false}
+                }
+                const u2=new Set(st.usedIds),q=pickQ(st.diff,u2);if(q)u2.add(q.id);
+                return{...st,round:2,qNum:0,curQ:q,usedIds:u2,active:1,
+                    tRun:false,tSec:st.settings.timer,r1timer:0,
+                    pts:10,passed:false,revealed:false,answered:false,selCat:null}
+            }
+            const u2=new Set(st.usedIds),q=pickQ(st.diff,u2);if(q)u2.add(q.id);
+            return{...st,r1qCount:nc,curQ:q,usedIds:u2,
+                answered:false,revealed:false,passed:false,pts:10}
+        }
+        /* ── Round 2 ── */
+        if(st.round===2){
+            const nq=st.qNum+1;
+            if(nq>=r2c){
+                return{...st,round:3,qNum:0,curQ:null,usedIds:st.usedIds,active:1,
+                    tRun:false,tSec:st.settings.timer,
+                    pts:10,passed:false,revealed:false,answered:false,selCat:null,r3pts:0}
+            }
+            const u2=new Set(st.usedIds),na=nq%2===0?1:2;
+            const q=pickQ(st.diff,u2);if(q)u2.add(q.id);
+            return{...st,qNum:nq,curQ:q,usedIds:u2,active:na,tRun:false,
+                tSec:st.settings.timer,passed:false,revealed:false,answered:false,selCat:null,pts:10}
+        }
+        /* ── Round 3 ── */
+        if(st.round===3){
+            const nq=st.qNum+1;
+            if(nq>=r3c){
+                if(st.s1===st.s2){
+                    const u2=new Set(st.usedIds),q=pickQ(st.diff,u2,null,'tiebreaker');if(q)u2.add(q.id);
+                    return{...st,round:'tiebreaker',qNum:0,curQ:q,usedIds:u2,active:1,tRun:false,
+                        tSec:st.settings.timer,pts:10,passed:false,revealed:false,answered:false,selCat:null,tb1:'',tb2:''}
                 }
                 const w=st.s1>st.s2?1:2;
-                return {...st,over:true,gameOn:false,winner:w,screen:'results'};
+                return{...st,over:true,gameOn:false,winner:w,screen:'results'}
             }
-            // new round
-            const u2=new Set(st.usedIds); let q=null;
-            if(nr!==3){ q=pickQ(st.diff,u2); if(q)u2.add(q.id); }
-            return {...st,round:nr,qNum:0,curQ:q,usedIds:u2,
-                active:nr===2?1:2, tRun:false,tSec:st.settings.timer,
-                pts:10,passed:false,revealed:false,answered:false,selCat:null};
+            const na=nq%2===0?1:2;
+            return{...st,qNum:nq,curQ:null,usedIds:st.usedIds,active:na,tRun:false,
+                tSec:st.settings.timer,passed:false,revealed:false,answered:false,selCat:null,r3pts:0}
         }
-        // next question same round
-        const u2=new Set(st.usedIds); let q=null, na=st.active;
-        if(st.round===2){ na=nq%2===0?1:2; q=pickQ(st.diff,u2); }
-        else if(st.round===3){ na=nq%2===0?1:2; q=null; }
-        else { q=pickQ(st.diff,u2); }
-        if(q) u2.add(q.id);
-        return {...st,qNum:nq,curQ:q,usedIds:u2,active:na,tRun:false,
-            tSec:st.settings.timer,passed:false,revealed:false,answered:false,selCat:null};
+        return st;
     }
     case 'SEL_CAT':{
-        const u2=new Set(st.usedIds), q=pickQ(st.diff,u2,a.cat); if(q)u2.add(q.id);
-        return {...st,curQ:q,usedIds:u2,selCat:a.cat}; }
-    // ── Tiebreaker ──
-    case 'TB_GUESS': return {...st,[a.p===1?'tb1':'tb2']:a.v};
+        const u2=new Set(st.usedIds),q=pickQ(st.diff,u2,a.cat);if(q)u2.add(q.id);
+        return{...st,curQ:q,usedIds:u2,selCat:a.cat}}
+    /* Tiebreaker */
+    case 'TB_GUESS': return{...st,[a.p===1?'tb1':'tb2']:a.v};
     case 'TB_RESOLVE':{
-        const correct=parseFloat(st.curQ.answer), g1=parseFloat(st.tb1), g2=parseFloat(st.tb2);
-        const d1=Math.abs(g1-correct), d2=Math.abs(g2-correct);
-        let w; if(d1<d2)w=1; else if(d2<d1)w=2; else w=Math.random()<0.5?1:2;
-        return {...st,over:true,gameOn:false,winner:w,revealed:true,screen:'results'}; }
-    // ── Save & End ──
+        const correct=parseFloat(st.curQ.answer),g1=parseFloat(st.tb1),g2=parseFloat(st.tb2);
+        const d1=Math.abs(g1-correct),d2=Math.abs(g2-correct);
+        let w;if(d1<d2)w=1;else if(d2<d1)w=2;else w=Math.random()<.5?1:2;
+        return{...st,over:true,gameOn:false,winner:w,revealed:true,screen:'results'}}
+    /* Save / End */
     case 'SAVE':{
         const r={id:Date.now(),date:st.gameDate,p1:st.p1,p2:st.p2,s1:st.s1,s2:st.s2,
-            diff:st.diff,winner:st.winner===1?st.p1.name:st.p2.name,winnerId:st.winner===1?st.p1.id:st.p2.id};
-        const h=[...st.history,r]; S.s('history',h); return {...st,history:h}; }
+            diff:st.diff,winner:st.winner===1?st.p1.name:st.p2.name,winnerId:st.winner===1?st.p1.id:st.p2.id,
+            usedQIds:[...st.usedIds]};
+        const h=[...st.history,r];S.s('history',h);return{...st,history:h}}
     case 'END_GAME':
-        return {...st,gameOn:false,over:false,screen:'home',curQ:null,tRun:false};
-    case 'UPD_SETTINGS':{
-        const s={...st.settings,...a.s}; S.s('settings',s); SFX.enabled=s.sound; return {...st,settings:s}; }
-    case 'DEL_HIST':{ const h=st.history.filter(x=>x.id!==a.id); S.s('history',h); return {...st,history:h}; }
-    case 'CLR_HIST':{ S.s('history',[]); return {...st,history:[]}; }
-    default: return st;
+        return{...st,gameOn:false,over:false,screen:'home',curQ:null,tRun:false,testMode:false};
+    case 'UPD_SETTINGS':{const s={...st.settings,...a.s};S.s('settings',s);SFX.enabled=s.sound;return{...st,settings:s}}
+    case 'DEL_HIST':{const h=st.history.filter(x=>x.id!==a.id);S.s('history',h);return{...st,history:h}}
+    case 'CLR_HIST':{S.s('history',[]);return{...st,history:[]}}
+    default:return st;
     }
 }
 
-// ────────────── CONTEXT ──────────────
-const Ctx = createContext();
+/* ═══════════════ CONTEXT ═══════════════ */
+const Ctx=createContext();
 function Provider({children}){
-    const [st,dp]=useReducer(reducer,init);
+    const[st,dp]=useReducer(reducer,init);
+    const r1Ref=useRef(null);
     const timerRef=useRef(null);
 
-    // Timer
+    /* R1 countdown */
     useEffect(()=>{
-        if(st.tRun){ timerRef.current=setInterval(()=>dp({type:'T_TICK'}),1000); return()=>clearInterval(timerRef.current); }
-        else { if(timerRef.current)clearInterval(timerRef.current); }
-    },[st.tRun]);
+        if(st.round===1&&st.tRun&&st.gameOn){
+            r1Ref.current=setInterval(()=>dp({type:'R1_TICK'}),1000);
+            return()=>clearInterval(r1Ref.current);
+        }else{if(r1Ref.current)clearInterval(r1Ref.current)}
+    },[st.round,st.tRun,st.gameOn]);
 
-    // Timer sounds
+    /* R2/R3 timer */
     useEffect(()=>{
-        if(!st.tRun) return;
-        if(st.tSec>3) SFX.tick();
-        else if(st.tSec>0) SFX.tickLow();
-        else if(st.tSec===0) SFX.buzzer();
-    },[st.tSec,st.tRun]);
+        if(st.round!==1&&st.tRun){
+            timerRef.current=setInterval(()=>dp({type:'T_TICK'}),1000);
+            return()=>clearInterval(timerRef.current);
+        }else{if(timerRef.current)clearInterval(timerRef.current)}
+    },[st.tRun,st.round]);
 
-    // TV sync
+    /* sounds R2/R3 */
     useEffect(()=>{
-        if(!st.gameOn && st.screen!=='results'){
-            sendTV('WAITING',{msg:'Čakám na hru…'}); return;
+        if(st.round===1||!st.tRun)return;
+        if(st.tSec>3)SFX.tick();else if(st.tSec>0)SFX.tickLow();else if(st.tSec===0)SFX.buzzer();
+    },[st.tSec,st.tRun,st.round]);
+
+    /* sounds R1 */
+    useEffect(()=>{
+        if(st.round!==1||!st.tRun)return;
+        if(st.r1timer<=5&&st.r1timer>0)SFX.tickLow();
+        else if(st.r1timer===0)SFX.buzzer();
+        else if(st.r1timer%5===0)SFX.tick();
+    },[st.r1timer,st.tRun,st.round]);
+
+    /* TV sync */
+    useEffect(()=>{
+        if(!st.gameOn&&st.screen!=='results'){
+            if(!st.testMode)sendTV('WAITING',{msg:'Čakám na hru…'});return;
         }
-        sendTV('UPDATE',{
-            screen:st.screen, p1:st.p1, p2:st.p2, s1:st.s1, s2:st.s2,
-            round:st.round, roundName:ROUND_NAMES[st.round], qNum:st.qNum+1,
+        const r2c=st.settings.r2count||10,r3c=st.settings.r3count||20;
+        const payload={
+            screen:st.screen,p1:st.p1,p2:st.p2,s1:st.s1,s2:st.s2,
+            round:st.round,roundName:ROUND_NAMES[st.round],
+            qNum:st.round===1?st.r1qCount+1:st.qNum+1,
+            qTotal:st.round===1?R1_Q_PER_PLAYER:st.round===2?r2c:r3c,
             q:st.curQ?{question:st.curQ.question,category:CAT_LABELS[st.curQ.category]||st.curQ.category,type:st.curQ.type}:null,
-            answer:st.revealed?st.curQ?.answer:null, active:st.active, tRun:st.tRun,
-            tSec:st.tSec, tDur:st.settings.timer, pts:st.pts, diff:st.diff,
-            over:st.over, winner:st.winner, answered:st.answered,
-        });
-    },[st.screen,st.s1,st.s2,st.round,st.curQ,st.tSec,st.tRun,st.active,st.gameOn,st.over,st.revealed,st.answered,st.winner,st.pts,st.qNum]);
+            answer:st.revealed?st.curQ?.answer:null,active:st.active,tRun:st.tRun,
+            tSec:st.round===1?st.r1timer:st.tSec,
+            tDur:st.round===1?R1_TOTAL_SEC:st.settings.timer,
+            pts:st.round===3?st.r3pts:st.pts,diff:st.diff,
+            over:st.over,winner:st.winner,answered:st.answered,r1phase:st.r1phase,
+        };
+        if(!st.testMode)sendTV('UPDATE',payload);
+    },[st.screen,st.s1,st.s2,st.round,st.curQ,st.tSec,st.tRun,st.active,
+       st.gameOn,st.over,st.revealed,st.answered,st.winner,st.pts,st.qNum,
+       st.r1timer,st.r1qCount,st.r1phase,st.testMode,st.r3pts]);
 
-    // Sound init
-    useEffect(()=>{ SFX.enabled=st.settings.sound; },[]);
+    useEffect(()=>{SFX.enabled=st.settings.sound},[]);
 
     return <Ctx.Provider value={{st,dp}}>{children}</Ctx.Provider>;
 }
-const use$ = ()=>useContext(Ctx);
+const use$=()=>useContext(Ctx);
 
-// ════════════════════════════════════════════════════
-//   UI COMPONENTS
-// ════════════════════════════════════════════════════
-
-// ── Reusable ──
+/* ─── REUSABLE ─── */
 const Btn=({children,onClick,cls='',disabled=false,...p})=>(
     <button onClick={onClick} disabled={disabled}
-        className={`px-4 py-2 rounded-lg font-semibold transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed ${cls}`} {...p}>
-        {children}
-    </button>
+        className={`px-4 py-2 rounded-lg font-semibold transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed ${cls}`}{...p}>{children}</button>
 );
 const Card=({children,cls=''})=><div className={`bg-card rounded-xl p-5 ${cls}`}>{children}</div>;
 
-// ════════════ HOME SCREEN ════════════
+/* ════════════ HOME ════════════ */
 function HomeScreen(){
-    const {dp}=use$();
-    return (
+    const{dp}=use$();
+    return(
         <div className="flex flex-col items-center justify-center min-h-screen gap-6 p-6">
-            <h1 className="text-7xl font-black tracking-tight text-accent mb-2" style={{textShadow:'0 0 40px rgba(234,179,8,0.3)'}}>DUEL</h1>
-            <p className="text-slate-400 text-lg mb-8">Vedomostná súťaž pre rodinu</p>
+            <h1 className="text-7xl font-black tracking-tight text-accent mb-2" style={{textShadow:'0 0 40px rgba(234,179,8,.3)'}}>DUEL</h1>
+            <p className="text-slate-400 text-lg mb-8">Vedomostná súťaž pre rodinu · v2</p>
             <div className="flex flex-col gap-3 w-72">
                 <Btn cls="bg-accent text-black hover:bg-yellow-400 text-lg py-3" onClick={()=>dp({type:'NAV',to:'setup'})}>🎮 Nová hra</Btn>
                 <Btn cls="bg-card hover:bg-card2 border border-slate-600" onClick={()=>dp({type:'NAV',to:'players'})}>👤 Hráči</Btn>
@@ -288,25 +370,21 @@ function HomeScreen(){
     );
 }
 
-// ════════════ PLAYERS SCREEN ════════════
+/* ════════════ PLAYERS ════════════ */
 function PlayersScreen(){
-    const {st,dp}=use$();
-    const [name,setName]=useState('');
-    const [age,setAge]=useState('');
-    const [editId,setEditId]=useState(null);
-
+    const{st,dp}=use$();
+    const[name,setName]=useState('');
+    const[age,setAge]=useState('');
+    const[editId,setEditId]=useState(null);
     const save=()=>{
-        if(!name.trim()) return;
-        if(editId){ dp({type:'EDIT_P',id:editId,name:name.trim(),age:parseInt(age)||0}); setEditId(null); }
-        else { dp({type:'ADD_P',name:name.trim(),age:parseInt(age)||0}); }
-        setName(''); setAge('');
+        if(!name.trim())return;
+        if(editId){dp({type:'EDIT_P',id:editId,name:name.trim(),age:parseInt(age)||0});setEditId(null)}
+        else{dp({type:'ADD_P',name:name.trim(),age:parseInt(age)||0})}
+        setName('');setAge('');
     };
-    const startEdit=(p)=>{ setEditId(p.id); setName(p.name); setAge(p.age+''); };
-    const cancel=()=>{ setEditId(null); setName(''); setAge(''); };
-
-    return (
+    return(
         <div className="max-w-xl mx-auto p-6">
-            <button onClick={()=>dp({type:'NAV',to:'home'})} className="text-slate-400 hover:text-white mb-4 flex items-center gap-1">← Späť</button>
+            <button onClick={()=>dp({type:'NAV',to:'home'})} className="text-slate-400 hover:text-white mb-4">← Späť</button>
             <h2 className="text-3xl font-bold mb-6">👤 Správa hráčov</h2>
             <Card cls="mb-6">
                 <h3 className="font-semibold mb-3">{editId?'Upraviť hráča':'Pridať hráča'}</h3>
@@ -316,56 +394,46 @@ function PlayersScreen(){
                     <input value={age} onChange={e=>setAge(e.target.value)} placeholder="Vek" type="number"
                         className="w-20 bg-card2 rounded-lg px-3 py-2 outline-none focus:ring-2 ring-accent"/>
                     <Btn cls="bg-accent text-black hover:bg-yellow-400" onClick={save}>{editId?'Uložiť':'Pridať'}</Btn>
-                    {editId && <Btn cls="bg-card2 hover:bg-slate-600" onClick={cancel}>Zrušiť</Btn>}
+                    {editId&&<Btn cls="bg-card2 hover:bg-slate-600" onClick={()=>{setEditId(null);setName('');setAge('')}}>Zrušiť</Btn>}
                 </div>
             </Card>
-            {st.players.length===0 ? <p className="text-slate-500 text-center">Zatiaľ žiadni hráči. Pridajte prvého hráča.</p> :
-            <div className="space-y-2">
-                {st.players.map(p=>(
-                    <div key={p.id} className="bg-card rounded-lg p-3 flex items-center justify-between">
-                        <div>
-                            <span className="font-semibold">{p.name}</span>
-                            <span className="text-slate-400 ml-2 text-sm">{p.age} rokov</span>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={()=>startEdit(p)} className="text-blue-400 hover:text-blue-300 text-sm">✏️ Upraviť</button>
-                            <button onClick={()=>{if(confirm(`Odstrániť hráča ${p.name}?`))dp({type:'DEL_P',id:p.id})}}
-                                className="text-red-400 hover:text-red-300 text-sm">🗑️ Odstrániť</button>
-                        </div>
+            {st.players.length===0?<p className="text-slate-500 text-center">Zatiaľ žiadni hráči.</p>:
+            <div className="space-y-2">{st.players.map(p=>(
+                <div key={p.id} className="bg-card rounded-lg p-3 flex items-center justify-between">
+                    <div><span className="font-semibold">{p.name}</span><span className="text-slate-400 ml-2 text-sm">{p.age} rokov</span></div>
+                    <div className="flex gap-2">
+                        <button onClick={()=>{setEditId(p.id);setName(p.name);setAge(p.age+'')}} className="text-blue-400 hover:text-blue-300 text-sm">✏️</button>
+                        <button onClick={()=>{if(confirm(`Odstrániť ${p.name}?`))dp({type:'DEL_P',id:p.id})}} className="text-red-400 hover:text-red-300 text-sm">🗑️</button>
                     </div>
-                ))}
-            </div>}
+                </div>
+            ))}</div>}
         </div>
     );
 }
 
-// ════════════ SETUP SCREEN ════════════
+/* ════════════ SETUP ════════════ */
 function SetupScreen(){
-    const {st,dp}=use$();
-    const [p1id,setP1]=useState(st.p1?.id||'');
-    const [p2id,setP2]=useState(st.p2?.id||'');
-    const [diff,setDiff]=useState(st.diff);
-    const [date,setDate]=useState(st.gameDate);
-
-    const canStart = p1id && p2id && p1id!==p2id;
-    const start=()=>{
-        const pl1=st.players.find(p=>p.id===+p1id);
-        const pl2=st.players.find(p=>p.id===+p2id);
-        if(!pl1||!pl2) return;
+    const{st,dp}=use$();
+    const[p1id,setP1]=useState(st.p1?.id||'');
+    const[p2id,setP2]=useState(st.p2?.id||'');
+    const[diff,setDiff]=useState(st.diff);
+    const[date,setDate]=useState(st.gameDate);
+    const canStart=p1id&&p2id&&p1id!==p2id;
+    const doStart=(test=false)=>{
+        const pl1=st.players.find(p=>p.id===+p1id),pl2=st.players.find(p=>p.id===+p2id);
+        if(!pl1||!pl2)return;
         dp({type:'SETUP',d:{p1:{id:pl1.id,name:pl1.name},p2:{id:pl2.id,name:pl2.name},diff,gameDate:date}});
+        dp({type:'SET_TEST',v:test});
         dp({type:'START_GAME'});
     };
-
-    return (
+    return(
         <div className="max-w-lg mx-auto p-6">
-            <button onClick={()=>dp({type:'NAV',to:'home'})} className="text-slate-400 hover:text-white mb-4 flex items-center gap-1">← Späť</button>
+            <button onClick={()=>dp({type:'NAV',to:'home'})} className="text-slate-400 hover:text-white mb-4">← Späť</button>
             <h2 className="text-3xl font-bold mb-6">🎮 Nastavenie hry</h2>
-            {st.players.length<2 ? (
-                <Card>
-                    <p className="text-slate-400 mb-3">Na hru sú potrební minimálne 2 hráči.</p>
-                    <Btn cls="bg-accent text-black" onClick={()=>dp({type:'NAV',to:'players'})}>Pridať hráčov</Btn>
-                </Card>
-            ) : (
+            {st.players.length<2?(
+                <Card><p className="text-slate-400 mb-3">Minimálne 2 hráči.</p>
+                <Btn cls="bg-accent text-black" onClick={()=>dp({type:'NAV',to:'players'})}>Pridať hráčov</Btn></Card>
+            ):(
                 <Card cls="space-y-5">
                     <div>
                         <label className="block text-sm text-slate-400 mb-1">Dátum</label>
@@ -390,228 +458,441 @@ function SetupScreen(){
                             </select>
                         </div>
                     </div>
-                    {p1id && p2id && p1id===p2id && <p className="text-red-400 text-sm">Vyber rôznych hráčov!</p>}
+                    {p1id&&p2id&&p1id===p2id&&<p className="text-red-400 text-sm">Vyber rôznych hráčov!</p>}
                     <div>
                         <label className="block text-sm text-slate-400 mb-2">Obtiažnosť</label>
                         <div className="flex gap-2">
                             {Object.entries(DIFF_LABELS).map(([k,v])=>(
                                 <button key={k} onClick={()=>setDiff(k)}
-                                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${diff===k?'bg-accent text-black':'bg-card2 hover:bg-slate-600'}`}>
-                                    {v}
-                                </button>
+                                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${diff===k?'bg-accent text-black':'bg-card2 hover:bg-slate-600'}`}>{v}</button>
                             ))}
                         </div>
                     </div>
-                    <Btn cls="w-full bg-accent text-black hover:bg-yellow-400 text-lg py-3" onClick={start} disabled={!canStart}>
-                        🚀 Štart hry
-                    </Btn>
+                    <div className="flex gap-3">
+                        <Btn cls="flex-1 bg-accent text-black hover:bg-yellow-400 text-lg py-3" onClick={()=>doStart(false)} disabled={!canStart}>
+                            🚀 Štart hry</Btn>
+                        <Btn cls="bg-purple-600 text-white hover:bg-purple-500 py-3 px-5" onClick={()=>doStart(true)} disabled={!canStart}>
+                            🧪 Test hry</Btn>
+                    </div>
                 </Card>
             )}
         </div>
     );
 }
 
-// ════════════ GAME SCREEN ════════════
-function GameScreen(){
-    const {st,dp}=use$();
-    const isTB = st.round==='tiebreaker';
+/* ════════════════════════════════════════
+   EMBEDDED TV (for test mode split-screen)
+   ════════════════════════════════════════ */
+function EmbeddedTV(){
+    const{st}=use$();
+    const isJunior=st.diff==='junior';
+    const r2c=st.settings.r2count||10,r3c=st.settings.r3count||20;
+    const qNum=st.round===1?st.r1qCount+1:st.qNum+1;
+    const qTotal=st.round===1?R1_Q_PER_PLAYER:st.round===2?r2c:r3c;
+    const tSec=st.round===1?st.r1timer:st.tSec;
+    const tDur=st.round===1?R1_TOTAL_SEC:st.settings.timer;
+    const ptsDisplay=st.round===3?st.r3pts:st.pts;
 
-    const chooser = st.active===1?2:1; // who picks category in Round 3
-
-    // ── Header ──
-    const header = (
-        <div className="bg-card border-b border-slate-700 px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-                <button onClick={()=>{if(confirm('Ukončiť hru? Výsledky sa neuložia.'))dp({type:'END_GAME'})}}
-                    className="text-slate-400 hover:text-white text-sm">✕ Ukončiť</button>
-                <div>
-                    <span className="text-accent font-bold">Kolo {typeof st.round==='number'?st.round+'/3':''}: {ROUND_NAMES[st.round]}</span>
-                    <span className="text-slate-400 ml-3">Otázka {st.qNum+1}/5</span>
-                </div>
-            </div>
-            <span className="text-sm text-slate-400">{DIFF_LABELS[st.diff]}</span>
+    /* waiting */
+    if(!st.gameOn&&st.screen!=='results')return(
+        <div className={`h-full flex flex-col items-center justify-center ${isJunior?'junior-bg':'standard-bg'}`}>
+            <div className="anim-float"><h1 className="text-6xl font-black text-accent" style={{textShadow:'0 0 40px rgba(234,179,8,.3)'}}>DUEL</h1></div>
+            <p className="text-slate-500 mt-4 text-sm">Čakám na hru…</p>
         </div>
     );
 
-    // ── Player Cards ──
-    const playerCard = (num, name, score, isActive) => (
-        <div className={`rounded-xl p-4 border-2 transition-all duration-300 ${
-            isActive ? (num===1?'border-p1 bg-blue-950/50 shadow-lg shadow-blue-500/20':'border-p2 bg-red-950/50 shadow-lg shadow-red-500/20')
-            : 'border-slate-700 bg-card'}`}>
-            <div className="flex items-center gap-2 mb-2">
-                <span className={`w-3 h-3 rounded-full ${num===1?'bg-p1':'bg-p2'} ${isActive?'animate-pulse':''}`}/>
-                <span className="font-semibold">{name}</span>
-                {isActive && <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">AKTÍVNY</span>}
+    /* results */
+    if(st.over||st.screen==='results'){
+        const wn=st.winner===1?st.p1?.name:st.p2?.name;
+        const wc=st.winner===1?'text-p1':'text-p2';
+        return(
+            <div className={`h-full flex flex-col items-center justify-center ${isJunior?'junior-bg':'standard-bg'}`}>
+                <div className="anim-pop text-center">
+                    <div className="text-6xl mb-4">🏆</div>
+                    <h2 className="text-xl text-slate-400 font-semibold mb-1">Víťaz</h2>
+                    <h1 className={`text-5xl font-black ${wc} mb-6`}>{wn}</h1>
+                    <div className="flex items-center justify-center gap-8">
+                        <div className="text-center">
+                            <div className={`text-xs mb-1 ${st.winner===1?'text-accent':'text-slate-500'}`}>{st.p1?.name}</div>
+                            <div className={`text-5xl font-black ${st.winner===1?'text-p1':'text-slate-600'}`}>{st.s1}</div>
+                        </div>
+                        <div className="text-3xl text-slate-700 font-bold">:</div>
+                        <div className="text-center">
+                            <div className={`text-xs mb-1 ${st.winner===2?'text-accent':'text-slate-500'}`}>{st.p2?.name}</div>
+                            <div className={`text-5xl font-black ${st.winner===2?'text-p2':'text-slate-600'}`}>{st.s2}</div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div className={`text-4xl font-black ${score<0?'text-red-400':num===1?'text-p1':'text-p2'}`}>{score}</div>
-            <div className="text-xs text-slate-500 mt-1">bodov</div>
-            {!isTB && !st.answered && (
-                <div className="flex gap-2 mt-3">
-                    {!isActive && st.round===1 && <Btn cls="bg-card2 hover:bg-slate-600 text-xs py-1 px-2"
-                        onClick={()=>dp({type:'SET_ACTIVE',p:num})}>Odpovedá</Btn>}
-                    <Btn cls="bg-ok/20 text-ok hover:bg-ok/30 text-xs py-1 px-2"
-                        onClick={()=>{dp({type:'CORRECT',p:num});SFX.correct();}} disabled={!isActive && st.round!==1}>✓</Btn>
-                    <Btn cls="bg-err/20 text-err hover:bg-err/30 text-xs py-1 px-2"
-                        onClick={()=>{dp({type:'WRONG',p:num});SFX.wrong();}} disabled={!isActive && st.round!==1}>✗</Btn>
+        );
+    }
+
+    /* timer */
+    const timerFrac=tDur>0?tSec/tDur:1;
+    const circ=2*Math.PI*42;
+    const dashOff=circ*(1-timerFrac);
+    const tCol=tSec<=3?'#ef4444':tSec<=6?'#eab308':'#22c55e';
+
+    const PCard=({name,score,num,isActive})=>{
+        const bc=num===1?'border-p1':'border-p2';
+        const bg=num===1?'from-blue-950/80 to-blue-950/20':'from-red-950/80 to-red-950/20';
+        return(
+            <div className={`w-36 rounded-xl border-2 p-3 transition-all duration-500 ${
+                isActive?`${bc} bg-gradient-to-b ${bg} shadow-lg`:'border-slate-800 bg-black/20'}`}>
+                {isActive&&<div className="text-center mb-1"><span className={`text-[10px] font-bold uppercase ${num===1?'text-p1':'text-p2'} animate-pulse`}>● ODPOVEDÁ</span></div>}
+                <div className="text-center mb-2">
+                    <div className={`w-2 h-2 rounded-full mx-auto mb-1 ${num===1?'bg-p1':'bg-p2'}`}/>
+                    <h3 className={`text-base font-bold ${isActive?'text-white':'text-slate-400'}`}>{name}</h3>
+                </div>
+                <div className="text-center">
+                    <div className={`text-4xl font-black ${score<0?'text-red-400':num===1?'text-p1':'text-p2'}`}>{score}</div>
+                    <div className="text-[10px] text-slate-600 uppercase tracking-widest">bodov</div>
+                </div>
+            </div>
+        );
+    };
+
+    return(
+        <div className={`h-full flex flex-col ${isJunior?'junior-bg':'standard-bg'} overflow-hidden`}>
+            {/* Top bar */}
+            <div className="flex items-center justify-between px-4 py-2 bg-black/30 text-xs">
+                <div className="flex items-center gap-2">
+                    <span className="text-accent font-black text-sm">DUEL</span>
+                    <span className="text-slate-500">│</span>
+                    <span className="text-slate-300">{ROUND_NAMES[st.round]}</span>
+                </div>
+                <span className="text-slate-400">Otázka {qNum}/{qTotal}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    isJunior?'bg-purple-600/30 text-purple-300':st.diff==='level1'?'bg-blue-600/30 text-blue-300':'bg-red-600/30 text-red-300'}`}>
+                    {st.diff==='junior'?'⭐ Junior':st.diff==='level1'?'🔥 L1':'💀 L2'}
+                </span>
+            </div>
+            {/* R1 timeline bar */}
+            {st.round===1&&(
+                <div className="h-2 bg-slate-800 w-full">
+                    <div className="h-full bg-gradient-to-r from-green-400 via-yellow-400 to-red-500 timeline-bar"
+                        style={{width:`${(tSec/R1_TOTAL_SEC)*100}%`,float:'right'}}/>
                 </div>
             )}
-        </div>
-    );
-
-    // ── Timer Display ──
-    const timerColor = st.tSec<=3 ? 'text-red-400' : st.tSec<=6 ? 'text-yellow-400' : 'text-white';
-
-    // ── Category Picker (Round 3) ──
-    const catPicker = st.round===3 && !st.selCat && (
-        <Card cls="mt-4">
-            <p className="text-sm text-slate-400 mb-3">
-                <span className={`font-bold ${chooser===1?'text-p1':'text-p2'}`}>
-                    {chooser===1?st.p1.name:st.p2.name}
-                </span> vyberá kategóriu pre{' '}
-                <span className={`font-bold ${st.active===1?'text-p1':'text-p2'}`}>
-                    {st.active===1?st.p1.name:st.p2.name}
-                </span>
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-                {getCats(st.diff).map(c=>(
-                    <Btn key={c} cls="bg-card2 hover:bg-accent hover:text-black text-sm py-2"
-                        onClick={()=>dp({type:'SEL_CAT',cat:c})}>
-                        {CAT_LABELS[c]||c}
-                    </Btn>
-                ))}
-            </div>
-        </Card>
-    );
-
-    // ── Tiebreaker UI ──
-    const tbUI = isTB && st.curQ && (
-        <Card cls="mt-4 space-y-4">
-            <div className="text-center">
-                <span className="text-accent font-bold text-lg">⚡ Rozstrel</span>
-                <p className="text-slate-400 text-sm mt-1">Oba hráči zadajú číselnú odpoveď. Najbližšia k správnej odpovedi vyhráva.</p>
-            </div>
-            <div className="bg-card2 rounded-lg p-4">
-                <p className="text-slate-400 text-xs mb-1">{CAT_LABELS[st.curQ.category]||st.curQ.category}</p>
-                <p className="text-xl font-semibold">{st.curQ.question}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="text-p1 text-sm font-semibold block mb-1">{st.p1.name}</label>
-                    <input type="number" value={st.tb1} onChange={e=>dp({type:'TB_GUESS',p:1,v:e.target.value})}
-                        className="w-full bg-card2 rounded-lg px-3 py-2 outline-none focus:ring-2 ring-p1 text-lg"/>
+            {/* Main */}
+            <div className="flex-1 flex items-center justify-between px-4 py-2 gap-4">
+                <PCard name={st.p1?.name} score={st.s1} num={1} isActive={st.active===1}/>
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 max-w-sm">
+                    {/* Timer R2/R3 */}
+                    {st.round!==1&&(st.tRun||tSec<tDur)&&(
+                        <div className="relative flex items-center justify-center">
+                            <svg width="80" height="80" viewBox="0 0 96 96" className={st.tRun&&tSec<=3?'anim-timer-pulse':''}>
+                                <circle cx="48" cy="48" r="42" fill="none" stroke="#1e293b" strokeWidth="4"/>
+                                <circle cx="48" cy="48" r="42" fill="none" stroke={tCol} strokeWidth="4"
+                                    strokeDasharray={circ} strokeDashoffset={dashOff}
+                                    strokeLinecap="round" className="timer-ring" transform="rotate(-90 48 48)"/>
+                            </svg>
+                            <span className={`absolute text-2xl font-black ${tSec<=3?'text-red-400':'text-white'}`}>{tSec}</span>
+                        </div>
+                    )}
+                    {/* R1 time */}
+                    {st.round===1&&st.tRun&&(
+                        <div className="text-center">
+                            <span className={`text-3xl font-black ${tSec<=10?'text-red-400':tSec<=30?'text-yellow-400':'text-white'}`}>
+                                {Math.floor(tSec/60)}:{(tSec%60).toString().padStart(2,'0')}
+                            </span>
+                            <div className="text-[10px] text-slate-500 mt-0.5">
+                                {st.r1phase===1?st.p1?.name:st.p2?.name} odpovedá
+                            </div>
+                        </div>
+                    )}
+                    {/* Pts */}
+                    <div className="flex items-center gap-1">
+                        <span className="text-accent font-black text-xl">{ptsDisplay}</span>
+                        <span className="text-slate-400 text-xs">b</span>
+                    </div>
+                    {/* Question */}
+                    {st.curQ?(
+                        <div className="anim-slide text-center w-full">
+                            <span className={`text-[10px] font-semibold uppercase tracking-widest mb-1 block ${isJunior?'text-purple-400':'text-accent/70'}`}>
+                                {CAT_LABELS[st.curQ.category]||st.curQ.category}
+                            </span>
+                            <div className={`bg-black/40 border ${isJunior?'border-purple-500/30':'border-accent/20'} rounded-xl p-4`}>
+                                <p className="font-bold text-base leading-snug">{st.curQ.question}</p>
+                            </div>
+                        </div>
+                    ):<div className="text-slate-600 text-sm">Čakám na otázku…</div>}
+                    {/* Answer */}
+                    {st.revealed&&st.curQ&&(
+                        <div className="anim-pop">
+                            <div className="bg-ok/10 border border-ok/30 rounded-lg px-4 py-2 text-sm">
+                                <span className="text-ok font-bold">✓ {st.curQ.answer}</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
-                <div>
-                    <label className="text-p2 text-sm font-semibold block mb-1">{st.p2.name}</label>
-                    <input type="number" value={st.tb2} onChange={e=>dp({type:'TB_GUESS',p:2,v:e.target.value})}
-                        className="w-full bg-card2 rounded-lg px-3 py-2 outline-none focus:ring-2 ring-p2 text-lg"/>
-                </div>
-            </div>
-            <Btn cls="w-full bg-accent text-black hover:bg-yellow-400 py-3"
-                onClick={()=>{dp({type:'TB_RESOLVE'});SFX.fanfare();}}
-                disabled={!st.tb1||!st.tb2}>
-                🏆 Vyhodnotiť rozstrel
-            </Btn>
-            {st.revealed && <p className="text-center text-slate-400">Správna odpoveď: <span className="text-accent font-bold">{st.curQ.answer}</span></p>}
-        </Card>
-    );
-
-    // ── Question Area ──
-    const questionArea = !isTB && st.curQ && (
-        <Card cls="mt-4">
-            <div className="flex items-center justify-between mb-2">
-                <span className="text-accent text-xs font-semibold uppercase tracking-wider">{CAT_LABELS[st.curQ.category]||st.curQ.category}</span>
-                <span className="text-xs text-slate-500">{st.curQ.type==='complete_sentence'?'Doplňovačka':st.curQ.type==='complete_name'?'Doplňte meno':st.curQ.type==='anagram'?'Presmyčka':''}</span>
-            </div>
-            <p className="text-xl font-semibold mb-4 leading-relaxed">{st.curQ.question}</p>
-            <div className="bg-card2 rounded-lg p-3">
-                {st.revealed ? (
-                    <p className="text-ok font-bold text-lg">✓ {st.curQ.answer}</p>
-                ) : (
-                    <button onClick={()=>dp({type:'REVEAL'})} className="text-slate-400 hover:text-white transition-colors">
-                        🔒 Klikni pre zobrazenie odpovede
-                    </button>
-                )}
-            </div>
-        </Card>
-    );
-
-    // ── Controls ──
-    const controls = !isTB && (
-        <div className="mt-4 space-y-3">
-            {/* Point value */}
-            <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-400 w-16">Body:</span>
-                <div className="flex gap-1">
-                    {PTS.map(v=>(
-                        <button key={v} onClick={()=>dp({type:'SET_PTS',v})}
-                            className={`w-12 h-10 rounded-lg font-bold text-sm transition-all ${
-                                st.pts===v?'bg-accent text-black scale-105':'bg-card hover:bg-card2'}`}>
-                            {v}
-                        </button>
-                    ))}
-                </div>
-            </div>
-            {/* Timer */}
-            <div className="flex items-center gap-3">
-                <span className="text-sm text-slate-400 w-16">Čas:</span>
-                <span className={`text-3xl font-black w-16 text-center ${timerColor}`}>{st.tSec}</span>
-                {!st.tRun ? (
-                    <Btn cls="bg-ok/20 text-ok hover:bg-ok/30" onClick={()=>dp({type:'T_START'})} disabled={st.answered}>▶ Štart</Btn>
-                ) : (
-                    <Btn cls="bg-err/20 text-err hover:bg-err/30" onClick={()=>dp({type:'T_STOP'})}>⏸ Stop</Btn>
-                )}
-            </div>
-            {/* Action buttons */}
-            <div className="flex flex-wrap gap-2">
-                {!st.passed && !st.answered && (
-                    <Btn cls="bg-purple-600/30 text-purple-300 hover:bg-purple-600/50" onClick={()=>dp({type:'PASS'})}>
-                        ↔ Postúpiť súperovi
-                    </Btn>
-                )}
-                <Btn cls="bg-slate-600/30 text-slate-300 hover:bg-slate-600/50" onClick={()=>{dp({type:'NO_POINTS'})}}
-                    disabled={st.answered}>
-                    ⊘ Bez bodov
-                </Btn>
-                <Btn cls="bg-accent/20 text-accent hover:bg-accent/30" onClick={()=>dp({type:'NEXT_Q'})}
-                    disabled={!st.answered && !st.passed}>
-                    Ďalšia otázka →
-                </Btn>
-            </div>
-        </div>
-    );
-
-    return (
-        <div className="min-h-screen flex flex-col">
-            {header}
-            <div className="flex-1 p-4 max-w-4xl mx-auto w-full">
-                {/* Score cards */}
-                <div className="grid grid-cols-2 gap-4">
-                    {playerCard(1, st.p1?.name, st.s1, st.active===1)}
-                    {playerCard(2, st.p2?.name, st.s2, st.active===2)}
-                </div>
-                {/* Category picker for Round 3 */}
-                {catPicker}
-                {/* Question */}
-                {questionArea}
-                {/* Tiebreaker */}
-                {tbUI}
-                {/* Controls */}
-                {st.curQ && controls}
+                <PCard name={st.p2?.name} score={st.s2} num={2} isActive={st.active===2}/>
             </div>
         </div>
     );
 }
 
-// ════════════ RESULTS SCREEN ════════════
+/* ════════════ GAME SCREEN ════════════ */
+function GameScreen(){
+    const{st,dp}=use$();
+    const isTB=st.round==='tiebreaker';
+    const isR1=st.round===1;
+    const isR3=st.round===3;
+    const r2c=st.settings.r2count||10,r3c=st.settings.r3count||20;
+    const chooser=st.active===1?2:1;
+    const qTotal=isR1?R1_Q_PER_PLAYER:st.round===2?r2c:r3c;
+    const qDisplay=isR1?st.r1qCount+1:st.qNum+1;
+    const ptsDisplay=isR3?st.r3pts:st.pts;
+
+    /* header */
+    const header=(
+        <div className="bg-card border-b border-slate-700 px-4 py-2 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+                <button onClick={()=>{if(confirm('Ukončiť hru?'))dp({type:'END_GAME'})}}
+                    className="text-slate-400 hover:text-white text-sm">✕ Koniec</button>
+                {st.testMode&&<span className="bg-purple-600/30 text-purple-300 text-xs px-2 py-0.5 rounded font-bold">🧪 TEST</span>}
+                <span className="text-accent font-bold">Kolo {typeof st.round==='number'?st.round+'/3':''}: {ROUND_NAMES[st.round]}</span>
+                <span className="text-slate-400 text-sm">Otázka {qDisplay}/{qTotal}</span>
+            </div>
+            <div className="flex items-center gap-3">
+                {st.testMode&&(
+                    <Btn cls="bg-card2 hover:bg-slate-600 text-xs py-1 px-2" onClick={()=>dp({type:'SET_TEST',v:false})}>📺 Produkcia</Btn>
+                )}
+                <span className="text-sm text-slate-400">{DIFF_LABELS[st.diff]}</span>
+            </div>
+        </div>
+    );
+
+    /* player card */
+    const playerCard=(num,name,score,isActive)=>(
+        <div className={`rounded-xl p-3 border-2 transition-all duration-300 ${
+            isActive?(num===1?'border-p1 bg-blue-950/50 shadow-lg shadow-blue-500/20':'border-p2 bg-red-950/50 shadow-lg shadow-red-500/20')
+            :'border-slate-700 bg-card'}`}>
+            <div className="flex items-center gap-2 mb-1">
+                <span className={`w-3 h-3 rounded-full ${num===1?'bg-p1':'bg-p2'} ${isActive?'animate-pulse':''}`}/>
+                <span className="font-semibold text-sm">{name}</span>
+                {isActive&&<span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded">AKTÍVNY</span>}
+            </div>
+            <div className={`text-3xl font-black ${score<0?'text-red-400':num===1?'text-p1':'text-p2'}`}>{score}</div>
+            <div className="text-xs text-slate-500">bodov</div>
+            {!isTB&&!st.answered&&(
+                <div className="flex gap-1 mt-2">
+                    {isR1&&!isActive&&<Btn cls="bg-card2 hover:bg-slate-600 text-[10px] py-0.5 px-1.5"
+                        onClick={()=>dp({type:'SET_ACTIVE',p:num})}>Odpovedá</Btn>}
+                    <Btn cls="bg-ok/20 text-ok hover:bg-ok/30 text-xs py-0.5 px-2"
+                        onClick={()=>{dp({type:'CORRECT',p:num});SFX.correct()}} disabled={!isActive&&!isR1}>✓</Btn>
+                    <Btn cls="bg-err/20 text-err hover:bg-err/30 text-xs py-0.5 px-2"
+                        onClick={()=>{dp({type:'WRONG',p:num});SFX.wrong()}} disabled={!isActive&&!isR1}>✗</Btn>
+                </div>
+            )}
+        </div>
+    );
+
+    /* R1 timeline on moderator */
+    const r1Timeline=isR1&&(
+        <div className="mt-2">
+            <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-slate-400">
+                    {st.r1phase===1?st.p1?.name:st.p2?.name} – zostáva
+                </span>
+                <span className={`text-lg font-black ${st.r1timer<=10?'text-red-400':st.r1timer<=30?'text-yellow-400':'text-white'}`}>
+                    {Math.floor(st.r1timer/60)}:{(st.r1timer%60).toString().padStart(2,'0')}
+                </span>
+            </div>
+            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-green-400 via-yellow-400 to-red-500 timeline-bar rounded-full"
+                    style={{width:`${(st.r1timer/R1_TOTAL_SEC)*100}%`}}/>
+            </div>
+        </div>
+    );
+
+    /* R2/R3 timer */
+    const timerColor=st.tSec<=3?'text-red-400':st.tSec<=6?'text-yellow-400':'text-white';
+
+    /* Cat picker (R3) */
+    const catPicker=isR3&&!st.selCat&&(
+        <Card cls="mt-3">
+            <p className="text-sm text-slate-400 mb-2">
+                <span className={`font-bold ${chooser===1?'text-p1':'text-p2'}`}>{chooser===1?st.p1.name:st.p2.name}</span> vyberá kategóriu pre{' '}
+                <span className={`font-bold ${st.active===1?'text-p1':'text-p2'}`}>{st.active===1?st.p1.name:st.p2.name}</span>
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+                {getCats(st.diff).map(c=>(
+                    <Btn key={c} cls="bg-card2 hover:bg-accent hover:text-black text-sm py-2"
+                        onClick={()=>dp({type:'SEL_CAT',cat:c})}>{CAT_LABELS[c]||c}</Btn>
+                ))}
+            </div>
+        </Card>
+    );
+
+    /* R3 point picker */
+    const r3PtsPicker=isR3&&st.selCat&&!st.answered&&(
+        <Card cls="mt-3">
+            <p className="text-sm text-slate-400 mb-2">
+                <span className={`font-bold ${st.active===1?'text-p1':'text-p2'}`}>{st.active===1?st.p1.name:st.p2.name}</span> si vyberá body (0–350):
+            </p>
+            <div className="flex items-center gap-2">
+                <input type="range" min="0" max="350" step="10" value={st.r3pts}
+                    onChange={e=>dp({type:'SET_R3PTS',v:+e.target.value})}
+                    className="flex-1 accent-yellow-400 h-3"/>
+                <span className="text-accent font-black text-2xl w-16 text-center">{st.r3pts}</span>
+            </div>
+            <div className="flex flex-wrap gap-1 mt-2">
+                {[0,50,100,150,200,250,300,350].map(v=>(
+                    <button key={v} onClick={()=>dp({type:'SET_R3PTS',v})}
+                        className={`px-2 py-1 rounded text-xs font-bold ${st.r3pts===v?'bg-accent text-black':'bg-card2 hover:bg-slate-600'}`}>{v}</button>
+                ))}
+            </div>
+        </Card>
+    );
+
+    /* Tiebreaker */
+    const tbUI=isTB&&st.curQ&&(
+        <Card cls="mt-3 space-y-3">
+            <div className="text-center">
+                <span className="text-accent font-bold">⚡ Rozstrel</span>
+                <p className="text-slate-400 text-xs">Najbližšia odpoveď vyhráva.</p>
+            </div>
+            <div className="bg-card2 rounded-lg p-3">
+                <p className="text-slate-400 text-xs mb-1">{CAT_LABELS[st.curQ.category]||st.curQ.category}</p>
+                <p className="text-lg font-semibold">{st.curQ.question}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-p1 text-xs font-semibold block mb-1">{st.p1.name}</label>
+                    <input type="number" value={st.tb1} onChange={e=>dp({type:'TB_GUESS',p:1,v:e.target.value})}
+                        className="w-full bg-card2 rounded-lg px-3 py-2 outline-none focus:ring-2 ring-p1"/></div>
+                <div><label className="text-p2 text-xs font-semibold block mb-1">{st.p2.name}</label>
+                    <input type="number" value={st.tb2} onChange={e=>dp({type:'TB_GUESS',p:2,v:e.target.value})}
+                        className="w-full bg-card2 rounded-lg px-3 py-2 outline-none focus:ring-2 ring-p2"/></div>
+            </div>
+            <Btn cls="w-full bg-accent text-black hover:bg-yellow-400 py-2" onClick={()=>{dp({type:'TB_RESOLVE'});SFX.fanfare()}} disabled={!st.tb1||!st.tb2}>
+                🏆 Vyhodnotiť</Btn>
+            {st.revealed&&<p className="text-center text-slate-400 text-sm">Správna: <span className="text-accent font-bold">{st.curQ.answer}</span></p>}
+        </Card>
+    );
+
+    /* Question area */
+    const questionArea=!isTB&&st.curQ&&(
+        <Card cls="mt-3">
+            <div className="flex items-center justify-between mb-1">
+                <span className="text-accent text-xs font-semibold uppercase tracking-wider">{CAT_LABELS[st.curQ.category]||st.curQ.category}</span>
+                <span className="text-[10px] text-slate-500">{st.curQ.type==='complete_sentence'?'Doplňovačka':st.curQ.type==='complete_name'?'Meno':st.curQ.type==='anagram'?'Presmyčka':''}</span>
+            </div>
+            <p className="text-lg font-semibold mb-3 leading-relaxed">{st.curQ.question}</p>
+            <div className="bg-card2 rounded-lg p-2">
+                {st.revealed?<p className="text-ok font-bold">✓ {st.curQ.answer}</p>:
+                    <button onClick={()=>dp({type:'REVEAL'})} className="text-slate-400 hover:text-white transition-colors text-sm">🔒 Zobraziť odpoveď</button>}
+            </div>
+        </Card>
+    );
+
+    /* Controls */
+    const controls=!isTB&&(
+        <div className="mt-3 space-y-2">
+            {/* Points R1/R2 */}
+            {!isR3&&(
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400 w-12">Body:</span>
+                    <div className="flex gap-1">
+                        {R12_PTS.map(v=>(
+                            <button key={v} onClick={()=>dp({type:'SET_PTS',v})}
+                                className={`w-10 h-8 rounded-lg font-bold text-xs transition-all ${st.pts===v?'bg-accent text-black scale-105':'bg-card hover:bg-card2'}`}>{v}</button>
+                        ))}
+                    </div>
+                </div>
+            )}
+            {/* Timer R2/R3 */}
+            {!isR1&&(
+                <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-400 w-12">Čas:</span>
+                    <span className={`text-2xl font-black w-12 text-center ${timerColor}`}>{st.tSec}</span>
+                    {!st.tRun?
+                        <Btn cls="bg-ok/20 text-ok hover:bg-ok/30 text-xs py-1" onClick={()=>dp({type:'T_START'})} disabled={st.answered}>▶ Štart</Btn>:
+                        <Btn cls="bg-err/20 text-err hover:bg-err/30 text-xs py-1" onClick={()=>dp({type:'T_STOP'})}>⏸ Stop</Btn>
+                    }
+                </div>
+            )}
+            {/* R1 start/stop */}
+            {isR1&&!st.tRun&&(
+                <Btn cls="bg-ok/20 text-ok hover:bg-ok/30 text-sm py-1" onClick={()=>dp({type:'T_START'})}>▶ Štart odpočtu (1:30)</Btn>
+            )}
+            {isR1&&st.tRun&&(
+                <div className="flex gap-2">
+                    <Btn cls="bg-err/20 text-err hover:bg-err/30 text-sm py-1" onClick={()=>dp({type:'T_STOP'})}>⏸ Pauza</Btn>
+                    <Btn cls="bg-purple-600/30 text-purple-300 hover:bg-purple-600/50 text-sm py-1" onClick={()=>dp({type:'R1_SKIP_PLAYER'})}>⏭ Ďalší hráč</Btn>
+                </div>
+            )}
+            {/* Actions */}
+            <div className="flex flex-wrap gap-2">
+                {!isR1&&!st.passed&&!st.answered&&(
+                    <Btn cls="bg-purple-600/30 text-purple-300 hover:bg-purple-600/50 text-xs py-1" onClick={()=>dp({type:'PASS'})}>↔ Súper</Btn>
+                )}
+                <Btn cls="bg-slate-600/30 text-slate-300 hover:bg-slate-600/50 text-xs py-1" onClick={()=>dp({type:'NO_POINTS'})} disabled={st.answered}>⊘ Bez bodov</Btn>
+                <Btn cls="bg-accent/20 text-accent hover:bg-accent/30 text-xs py-1" onClick={()=>dp({type:'NEXT_Q'})}
+                    disabled={!st.answered&&!st.passed}>Ďalšia →</Btn>
+            </div>
+        </div>
+    );
+
+    /* ── LAYOUT ── */
+    if(st.testMode){
+        return(
+            <div className="h-screen flex flex-col">
+                <div className="bg-purple-900/50 border-b border-purple-500/30 px-4 py-1 flex items-center justify-between">
+                    <span className="text-purple-300 font-bold text-sm">🧪 TESTOVACÍ REŽIM</span>
+                    <Btn cls="bg-purple-600/30 text-purple-200 hover:bg-purple-600/50 text-xs py-0.5 px-2"
+                        onClick={()=>dp({type:'SET_TEST',v:false})}>📺 Produkcia</Btn>
+                </div>
+                <div className="flex-1 flex overflow-hidden">
+                    <div className="w-1/2 flex flex-col overflow-y-auto bg-bg border-r border-slate-700">
+                        {header}
+                        <div className="flex-1 p-3">
+                            <div className="grid grid-cols-2 gap-3">
+                                {playerCard(1,st.p1?.name,st.s1,st.active===1)}
+                                {playerCard(2,st.p2?.name,st.s2,st.active===2)}
+                            </div>
+                            {r1Timeline}
+                            {catPicker}
+                            {r3PtsPicker}
+                            {questionArea}
+                            {tbUI}
+                            {st.curQ&&controls}
+                        </div>
+                    </div>
+                    <div className="w-1/2"><EmbeddedTV/></div>
+                </div>
+            </div>
+        );
+    }
+
+    return(
+        <div className="min-h-screen flex flex-col">
+            {header}
+            <div className="flex-1 p-4 max-w-4xl mx-auto w-full">
+                <div className="grid grid-cols-2 gap-4">
+                    {playerCard(1,st.p1?.name,st.s1,st.active===1)}
+                    {playerCard(2,st.p2?.name,st.s2,st.active===2)}
+                </div>
+                {r1Timeline}
+                {catPicker}
+                {r3PtsPicker}
+                {questionArea}
+                {tbUI}
+                {st.curQ&&controls}
+            </div>
+        </div>
+    );
+}
+
+/* ════════════ RESULTS ════════════ */
 function ResultsScreen(){
-    const {st,dp}=use$();
-    const [saved,setSaved]=useState(false);
-    const winnerName = st.winner===1?st.p1?.name:st.p2?.name;
+    const{st,dp}=use$();
+    const[saved,setSaved]=useState(false);
+    const winnerName=st.winner===1?st.p1?.name:st.p2?.name;
+    const doSave=()=>{dp({type:'SAVE'});setSaved(true);SFX.fanfare()};
 
-    const doSave=()=>{ dp({type:'SAVE'}); setSaved(true); SFX.fanfare(); };
-
-    return (
-        <div className="flex flex-col items-center justify-center min-h-screen p-6">
+    const content=(
+        <div className="flex flex-col items-center justify-center p-6">
             <div className="text-6xl mb-4">🏆</div>
             <h2 className="text-4xl font-black text-accent mb-2">Víťaz: {winnerName}!</h2>
             <div className="flex gap-8 my-6">
@@ -626,130 +907,138 @@ function ResultsScreen(){
                 </div>
             </div>
             <div className="flex gap-3 mt-4">
-                {!saved ? (
-                    <Btn cls="bg-ok text-white hover:bg-green-600 py-3 px-6" onClick={doSave}>💾 Uložiť výsledok</Btn>
-                ) : (
-                    <span className="text-ok font-semibold">✓ Výsledok uložený</span>
-                )}
+                {!saved?<Btn cls="bg-ok text-white hover:bg-green-600 py-3 px-6" onClick={doSave}>💾 Uložiť</Btn>
+                    :<span className="text-ok font-semibold">✓ Uložené</span>}
                 <Btn cls="bg-card hover:bg-card2 border border-slate-600 py-3 px-6" onClick={()=>dp({type:'NAV',to:'setup'})}>🔄 Nová hra</Btn>
                 <Btn cls="bg-card hover:bg-card2 border border-slate-600 py-3 px-6" onClick={()=>dp({type:'END_GAME'})}>🏠 Domov</Btn>
             </div>
         </div>
     );
+
+    if(st.testMode){
+        return(
+            <div className="h-screen flex">
+                <div className="w-1/2 flex items-center justify-center bg-bg border-r border-slate-700">{content}</div>
+                <div className="w-1/2"><EmbeddedTV/></div>
+            </div>
+        );
+    }
+    return <div className="min-h-screen flex items-center justify-center">{content}</div>;
 }
 
-// ════════════ LEADERBOARD SCREEN ════════════
+/* ════════════ LEADERBOARD ════════════ */
 function LeaderboardScreen(){
-    const {st,dp}=use$();
-    const [filterDiff,setFilter]=useState('all');
-
-    const filtered = filterDiff==='all' ? st.history : st.history.filter(h=>h.diff===filterDiff);
-
-    // Count wins per player
-    const wins = {};
-    filtered.forEach(h=>{
-        const w = h.winner;
-        wins[w] = (wins[w]||0) + 1;
-    });
-    const sorted = Object.entries(wins).sort((a,b)=>b[1]-a[1]);
-
+    const{st,dp}=use$();
+    const[filterDiff,setFilter]=useState('all');
+    const filtered=filterDiff==='all'?st.history:st.history.filter(h=>h.diff===filterDiff);
+    const wins={};
+    filtered.forEach(h=>{wins[h.winner]=(wins[h.winner]||0)+1});
+    const sorted=Object.entries(wins).sort((a,b)=>b[1]-a[1]);
     const exportXLS=()=>{
-        const data = sorted.map(([name,count],i)=>({'Poradie':i+1,'Hráč':name,'Víťazstvá':count}));
-        const ws = XLSX.utils.json_to_sheet(data);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Rebríček');
-        XLSX.writeFile(wb, `DUEL_Rebricek_${new Date().toISOString().slice(0,10)}.xlsx`);
+        const data=sorted.map(([name,count],i)=>({'Poradie':i+1,'Hráč':name,'Víťazstvá':count}));
+        const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb,ws,'Rebríček');
+        XLSX.writeFile(wb,`DUEL_Rebricek_${new Date().toISOString().slice(0,10)}.xlsx`);
     };
-
-    return (
+    return(
         <div className="max-w-xl mx-auto p-6">
-            <button onClick={()=>dp({type:'NAV',to:'home'})} className="text-slate-400 hover:text-white mb-4 flex items-center gap-1">← Späť</button>
+            <button onClick={()=>dp({type:'NAV',to:'home'})} className="text-slate-400 hover:text-white mb-4">← Späť</button>
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-3xl font-bold">🏆 Rebríček</h2>
-                {sorted.length>0 && <Btn cls="bg-ok/20 text-ok hover:bg-ok/30 text-sm" onClick={exportXLS}>📥 Excel</Btn>}
+                {sorted.length>0&&<Btn cls="bg-ok/20 text-ok hover:bg-ok/30 text-sm" onClick={exportXLS}>📥 Excel</Btn>}
             </div>
-            {/* Filter */}
             <div className="flex gap-2 mb-4">
                 <button onClick={()=>setFilter('all')} className={`px-3 py-1 rounded-lg text-sm ${filterDiff==='all'?'bg-accent text-black':'bg-card2 hover:bg-slate-600'}`}>Všetky</button>
                 {Object.entries(DIFF_LABELS).map(([k,v])=>(
                     <button key={k} onClick={()=>setFilter(k)} className={`px-3 py-1 rounded-lg text-sm ${filterDiff===k?'bg-accent text-black':'bg-card2 hover:bg-slate-600'}`}>{v}</button>
                 ))}
             </div>
-            {sorted.length===0 ? <p className="text-slate-500 text-center py-8">Žiadne výsledky.</p> : (
-                <div className="space-y-2">
-                    {sorted.map(([name,count],i)=>(
-                        <div key={name} className="bg-card rounded-lg p-3 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <span className={`text-2xl font-black w-10 text-center ${i===0?'text-yellow-400':i===1?'text-slate-300':i===2?'text-orange-400':'text-slate-500'}`}>
-                                    {i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1+'.'}
-                                </span>
-                                <span className="font-semibold">{name}</span>
-                            </div>
-                            <span className="text-accent font-bold text-lg">{count} {count===1?'výhra':count<5?'výhry':'výhier'}</span>
-                        </div>
-                    ))}
+            {sorted.length===0?<p className="text-slate-500 text-center py-8">Žiadne výsledky.</p>:
+            <div className="space-y-2">{sorted.map(([name,count],i)=>(
+                <div key={name} className="bg-card rounded-lg p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <span className={`text-2xl font-black w-10 text-center ${i===0?'text-yellow-400':i===1?'text-slate-300':i===2?'text-orange-400':'text-slate-500'}`}>
+                            {i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1+'.'}</span>
+                        <span className="font-semibold">{name}</span>
+                    </div>
+                    <span className="text-accent font-bold text-lg">{count} {count===1?'výhra':count<5?'výhry':'výhier'}</span>
                 </div>
-            )}
+            ))}</div>}
         </div>
     );
 }
 
-// ════════════ HISTORY SCREEN ════════════
+/* ════════════ HISTORY ════════════ */
 function HistoryScreen(){
-    const {st,dp}=use$();
-    return (
+    const{st,dp}=use$();
+    return(
         <div className="max-w-2xl mx-auto p-6">
-            <button onClick={()=>dp({type:'NAV',to:'home'})} className="text-slate-400 hover:text-white mb-4 flex items-center gap-1">← Späť</button>
+            <button onClick={()=>dp({type:'NAV',to:'home'})} className="text-slate-400 hover:text-white mb-4">← Späť</button>
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-3xl font-bold">📋 História hier</h2>
-                {st.history.length>0 && (
-                    <Btn cls="bg-err/20 text-err hover:bg-err/30 text-sm"
-                        onClick={()=>{if(confirm('Vymazať celú históriu?'))dp({type:'CLR_HIST'})}}>🗑️ Vymazať všetko</Btn>
-                )}
+                {st.history.length>0&&<Btn cls="bg-err/20 text-err hover:bg-err/30 text-sm" onClick={()=>{if(confirm('Vymazať celú históriu?'))dp({type:'CLR_HIST'})}}>🗑️ Všetko</Btn>}
             </div>
-            {st.history.length===0 ? <p className="text-slate-500 text-center py-8">Žiadne odohrané hry.</p> : (
-                <div className="space-y-2">
-                    {[...st.history].reverse().map(h=>(
-                        <div key={h.id} className="bg-card rounded-lg p-4">
-                            <div className="flex items-center justify-between mb-1">
-                                <span className="text-sm text-slate-400">{h.date} · {DIFF_LABELS[h.diff]||h.diff}</span>
-                                <button onClick={()=>dp({type:'DEL_HIST',id:h.id})} className="text-slate-500 hover:text-red-400 text-xs">✕</button>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <span className={`font-semibold ${h.winner===h.p1.name?'text-accent':''}`}>{h.p1.name}</span>
-                                <span className="text-p1 font-bold">{h.s1}</span>
-                                <span className="text-slate-600">:</span>
-                                <span className="text-p2 font-bold">{h.s2}</span>
-                                <span className={`font-semibold ${h.winner===h.p2.name?'text-accent':''}`}>{h.p2.name}</span>
-                                <span className="ml-auto text-accent text-sm">🏆 {h.winner}</span>
-                            </div>
-                        </div>
-                    ))}
+            {st.history.length===0?<p className="text-slate-500 text-center py-8">Žiadne hry.</p>:
+            <div className="space-y-2">{[...st.history].reverse().map(h=>(
+                <div key={h.id} className="bg-card rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-slate-400">{h.date} · {DIFF_LABELS[h.diff]||h.diff}</span>
+                        <button onClick={()=>dp({type:'DEL_HIST',id:h.id})} className="text-slate-500 hover:text-red-400 text-xs">✕</button>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span className={`font-semibold ${h.winner===h.p1.name?'text-accent':''}`}>{h.p1.name}</span>
+                        <span className="text-p1 font-bold">{h.s1}</span><span className="text-slate-600">:</span>
+                        <span className="text-p2 font-bold">{h.s2}</span>
+                        <span className={`font-semibold ${h.winner===h.p2.name?'text-accent':''}`}>{h.p2.name}</span>
+                        <span className="ml-auto text-accent text-sm">🏆 {h.winner}</span>
+                    </div>
                 </div>
-            )}
+            ))}</div>}
         </div>
     );
 }
 
-// ════════════ SETTINGS SCREEN ════════════
+/* ════════════ SETTINGS ════════════ */
 function SettingsScreen(){
-    const {st,dp}=use$();
-    const [timer,setTimer]=useState(st.settings.timer);
-
-    return (
+    const{st,dp}=use$();
+    const[timer,setTimer]=useState(st.settings.timer);
+    const[r2c,setR2]=useState(st.settings.r2count||10);
+    const[r3c,setR3]=useState(st.settings.r3count||20);
+    return(
         <div className="max-w-lg mx-auto p-6">
-            <button onClick={()=>dp({type:'NAV',to:'home'})} className="text-slate-400 hover:text-white mb-4 flex items-center gap-1">← Späť</button>
+            <button onClick={()=>dp({type:'NAV',to:'home'})} className="text-slate-400 hover:text-white mb-4">← Späť</button>
             <h2 className="text-3xl font-bold mb-6">⚙️ Nastavenia</h2>
             <Card cls="space-y-5">
                 <div>
-                    <label className="text-sm text-slate-400 block mb-2">Dĺžka časovača (sekundy)</label>
+                    <label className="text-sm text-slate-400 block mb-2">Časovač na otázku (kolo 2 a 3)</label>
                     <div className="flex items-center gap-3">
-                        <input type="range" min="5" max="30" value={timer} onChange={e=>setTimer(+e.target.value)}
-                            className="flex-1 accent-yellow-400"/>
+                        <input type="range" min="5" max="30" value={timer} onChange={e=>setTimer(+e.target.value)} className="flex-1 accent-yellow-400"/>
                         <span className="text-accent font-bold w-10 text-center">{timer}s</span>
                     </div>
-                    <Btn cls="bg-accent text-black hover:bg-yellow-400 mt-2 text-sm" onClick={()=>dp({type:'UPD_SETTINGS',s:{timer}})}>Uložiť</Btn>
                 </div>
+                <div>
+                    <label className="text-sm text-slate-400 block mb-2">Kolo 1 – Rýchla runda</label>
+                    <p className="text-xs text-slate-500">90 sekúnd na hráča · 10 otázok rapid-fire</p>
+                </div>
+                <div>
+                    <label className="text-sm text-slate-400 block mb-2">Počet otázok v 2. kole (párne, 10–20)</label>
+                    <div className="flex gap-2">
+                        {[10,12,14,16,18,20].map(v=>(
+                            <button key={v} onClick={()=>setR2(v)}
+                                className={`flex-1 py-2 rounded-lg text-sm font-bold ${r2c===v?'bg-accent text-black':'bg-card2 hover:bg-slate-600'}`}>{v}</button>
+                        ))}
+                    </div>
+                </div>
+                <div>
+                    <label className="text-sm text-slate-400 block mb-2">Počet otázok v 3. kole (párne, 10–20)</label>
+                    <div className="flex gap-2">
+                        {[10,12,14,16,18,20].map(v=>(
+                            <button key={v} onClick={()=>setR3(v)}
+                                className={`flex-1 py-2 rounded-lg text-sm font-bold ${r3c===v?'bg-accent text-black':'bg-card2 hover:bg-slate-600'}`}>{v}</button>
+                        ))}
+                    </div>
+                </div>
+                <Btn cls="bg-accent text-black hover:bg-yellow-400 w-full" onClick={()=>dp({type:'UPD_SETTINGS',s:{timer,r2count:r2c,r3count:r3c}})}>Uložiť nastavenia</Btn>
                 <div className="flex items-center justify-between">
                     <span>Zvukové efekty</span>
                     <button onClick={()=>dp({type:'UPD_SETTINGS',s:{sound:!st.settings.sound}})}
@@ -771,26 +1060,23 @@ function SettingsScreen(){
     );
 }
 
-// ════════════ APP ════════════
+/* ════════════ APP ════════════ */
 function App(){
-    const {st}=use$();
+    const{st}=use$();
     switch(st.screen){
-        case 'home': return <HomeScreen/>;
-        case 'players': return <PlayersScreen/>;
-        case 'setup': return <SetupScreen/>;
-        case 'game': return <GameScreen/>;
-        case 'results': return <ResultsScreen/>;
-        case 'leaderboard': return <LeaderboardScreen/>;
-        case 'hist': return <HistoryScreen/>;
-        case 'settings': return <SettingsScreen/>;
-        default: return <HomeScreen/>;
+        case 'home':return <HomeScreen/>;
+        case 'players':return <PlayersScreen/>;
+        case 'setup':return <SetupScreen/>;
+        case 'game':return <GameScreen/>;
+        case 'results':return <ResultsScreen/>;
+        case 'leaderboard':return <LeaderboardScreen/>;
+        case 'hist':return <HistoryScreen/>;
+        case 'settings':return <SettingsScreen/>;
+        default:return <HomeScreen/>;
     }
 }
 
-// ════════════ RENDER ════════════
-ReactDOM.createRoot(document.getElementById('root')).render(
-    <Provider><App/></Provider>
-);
-    </script>
+ReactDOM.createRoot(document.getElementById('root')).render(<Provider><App/></Provider>);
+</script>
 </body>
 </html>
