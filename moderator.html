@@ -88,6 +88,7 @@ historicke_podujatia:'from-orange-500/20 to-orange-600/5 border-orange-500/50',
 const R2_PTS=[10,20,30,40,50];
 const R3_PTS=Array.from({length:36},(_,i)=>i*10);
 const R1_TIME=90;
+const R1_MAX_Q=10;
 const R2_TIMER=10;
 
 /* ─── STORAGE ─── */
@@ -205,6 +206,14 @@ if(n<=0){
 }
 return{...st,r1timer:n}
 }
+/* R1 question limit reached */
+case 'R1_Q_LIMIT':{
+if(st.r1phase===1){
+    const u2=new Set(st.usedIds),q=pickQ('junior',u2);if(q)u2.add(q.id);
+    return{...st,r1timer:R1_TIME,r1tRun:false,r1phase:2,r1qCount:0,active:2,curQ:q,usedIds:u2,answered:false,revealed:false,pts:10}
+}
+return{...st,r1timer:0,r1tRun:false,showRoundSummary:true,summaryRound:1,curQ:null,answered:false,revealed:false}
+}
 
 case 'SET_PTS':return{...st,pts:a.v};
 case 'REVEAL':return{...st,revealed:true};
@@ -254,8 +263,8 @@ case 'NEXT_Q':{
 /* === Round 1 === */
 if(st.round===1){
     const nc=st.r1qCount+1;
-    if(st.r1timer<=0||nc>=999){
-        /* Time ran out – handled by R1_TICK */
+    if(st.r1timer<=0||nc>=R1_MAX_Q){
+        /* Time ran out or question limit reached */
         if(st.r1phase===1){
             const u2=new Set(st.usedIds),q=pickQ('junior',u2);if(q)u2.add(q.id);
             return{...st,r1phase:2,r1qCount:0,r1timer:R1_TIME,r1tRun:false,active:2,curQ:q,usedIds:u2,answered:false,revealed:false,pts:10}
@@ -371,10 +380,15 @@ useEffect(()=>{
 /* R1 auto-advance: when answered, auto-go to next question after 400ms */
 useEffect(()=>{
     if(st.round===1&&st.answered&&st.r1tRun){
-        autoAdvRef.current=setTimeout(()=>dp({type:'NEXT_Q'}),400);
+        const nextCount=st.r1qCount+1;
+        if(nextCount>=R1_MAX_Q){
+            autoAdvRef.current=setTimeout(()=>dp({type:'R1_Q_LIMIT'}),600);
+        }else{
+            autoAdvRef.current=setTimeout(()=>dp({type:'NEXT_Q'}),400);
+        }
         return()=>clearTimeout(autoAdvRef.current);
     }
-},[st.answered,st.round,st.r1tRun]);
+},[st.answered,st.round,st.r1tRun,st.r1qCount]);
 
 /* R2/R3 Timer */
 useEffect(()=>{
@@ -404,7 +418,7 @@ useEffect(()=>{
         screen:st.screen,p1:st.p1,p2:st.p2,s1:st.s1,s2:st.s2,
         round:st.round,roundName:ROUND_NAMES[st.round],
         qNum:st.round===1?st.r1qCount+1:st.qNum+1,
-        qTotal:st.round===1?'∞':st.round===2?r2c:r3c,
+        qTotal:st.round===1?R1_MAX_Q:st.round===2?r2c:r3c,
         q:showQOnTV&&st.curQ?{question:st.curQ.question,category:CAT_LABELS[st.curQ.category]||st.curQ.category,
             catKey:st.curQ.category,type:st.curQ.type}:null,
         answer:st.revealed?st.curQ?.answer:null,
@@ -602,7 +616,7 @@ const{st}=use$();
 const isJunior=st.diff==='junior';
 const r2c=st.settings.r2count||10,r3c=st.settings.r3count||20;
 const qNum=st.round===1?st.r1qCount+1:st.qNum+1;
-const qTotal=st.round===1?'∞':st.round===2?r2c:r3c;
+const qTotal=st.round===1?R1_MAX_Q:st.round===2?r2c:r3c;
 const allCats=getCats(st.diff);
 const availCats=allCats.filter(c=>!st.usedCats.includes(c));
 const embIsR3=st.round===3;
@@ -806,7 +820,7 @@ const isR1=st.round===1;
 const isR2=st.round===2;
 const isR3=st.round===3;
 const r2c=st.settings.r2count||10,r3c=st.settings.r3count||20;
-const qTotal=isR1?'∞':isR2?r2c:r3c;
+const qTotal=isR1?R1_MAX_Q:isR2?r2c:r3c;
 const qDisplay=isR1?st.r1qCount+1:st.qNum+1;
 const allCats=useMemo(()=>getCats(st.diff),[st.diff]);
 const availCats=allCats.filter(c=>!st.usedCats.includes(c));
@@ -931,7 +945,7 @@ const r1Info=isR1&&(
                     <span className={st.active===1?'text-p1':'text-p2'}>{st.active===1?st.p1?.name:st.p2?.name}</span>
                     <span style={{color:'var(--textSub)'}} className="ml-2 text-sm">· 10 bodov za správnu</span>
                 </p>
-                <p className="text-xs mt-1" style={{color:'var(--textSub)'}}>Otázka #{st.r1qCount+1}</p>
+                <p className="text-xs mt-1" style={{color:'var(--textSub)'}}>Otázka {st.r1qCount+1} / {R1_MAX_Q}</p>
             </div>
             <div className="flex items-center gap-3">
                 <div className={`text-4xl font-black ${st.r1timer<=10?'text-red-400':st.r1timer<=20?'text-yellow-400':'text-accent'}`}>
