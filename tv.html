@@ -184,12 +184,19 @@ return(
     </div>
 
     {/* Active player indicator */}
-    <div className="text-center py-3">
-        <span className={`text-3xl font-bold ${d.active===1?'text-blue-400':'text-red-400'}`}>
-            {d.active===1?'🔵':'🔴'} {d.active===1?d.p1?.name:d.p2?.name}
-        </span>
-        <span className="text-slate-400 text-2xl ml-3">vyberá okruh</span>
-    </div>
+    {(()=>{
+        const isR3=d.round===3;
+        const picker=d.picker||d.active;
+        const pickerName=picker===1?d.p1?.name:d.p2?.name;
+        const answererName=d.active===1?d.p1?.name:d.p2?.name;
+        return(<div className="text-center py-3">
+            <span className={`text-3xl font-bold ${picker===1?'text-blue-400':'text-red-400'}`}>
+                {picker===1?'🔵':'🔴'} {pickerName}
+            </span>
+            <span className="text-slate-400 text-2xl ml-3">{isR3?'vyberá okruh pre':'vyberá okruh'}</span>
+            {isR3&&<span className={`text-3xl font-bold ml-3 ${d.active===1?'text-blue-400':'text-red-400'}`}>{answererName}</span>}
+        </div>);
+    })()}
 
     {/* Category grid */}
     <div className="flex-1 flex items-center justify-center px-8 pb-6">

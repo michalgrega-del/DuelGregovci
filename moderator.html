@@ -281,7 +281,7 @@ if(st.round===3){
     if(nq>=r3c){
         return{...st,showRoundSummary:true,summaryRound:3,tRun:false,curQ:null,answered:false,revealed:false,selCat:null,passing:false}
     }
-    const na=nq%2===0?1:2;
+    const na=nq%2===0?2:1;
     return{...st,qNum:nq,curQ:null,usedIds:st.usedIds,active:na,originalActive:na,tRun:false,
         tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,passing:false}
 }
@@ -295,7 +295,7 @@ if(st.summaryRound===1){
         tRun:false,tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,usedCats:[],passing:false}
 }
 if(st.summaryRound===2){
-    return{...st,round:3,qNum:0,curQ:null,active:1,originalActive:1,showRoundSummary:false,summaryRound:null,
+    return{...st,round:3,qNum:0,curQ:null,active:2,originalActive:2,showRoundSummary:false,summaryRound:null,
         tRun:false,tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,usedCats:[],passing:false}
 }
 if(st.summaryRound===3){
@@ -398,15 +398,17 @@ useEffect(()=>{
     }
     const allCats=getCats(st.diff);
     const availCats=allCats.filter(c=>!st.usedCats.includes(c));
+    const showQOnTV=st.round===1||st.tRun||st.answered||st.passing||st.tSec<R2_TIMER;
+    const r3picker=st.round===3?(st.active===1?2:1):st.active;
     const payload={
         screen:st.screen,p1:st.p1,p2:st.p2,s1:st.s1,s2:st.s2,
         round:st.round,roundName:ROUND_NAMES[st.round],
         qNum:st.round===1?st.r1qCount+1:st.qNum+1,
         qTotal:st.round===1?'∞':st.round===2?r2c:r3c,
-        q:st.curQ?{question:st.curQ.question,category:CAT_LABELS[st.curQ.category]||st.curQ.category,
+        q:showQOnTV&&st.curQ?{question:st.curQ.question,category:CAT_LABELS[st.curQ.category]||st.curQ.category,
             catKey:st.curQ.category,type:st.curQ.type}:null,
         answer:st.revealed?st.curQ?.answer:null,
-        active:st.active,tRun:st.tRun,tSec:st.tSec,tDur:R2_TIMER,
+        active:st.active,picker:r3picker,tRun:st.tRun,tSec:st.tSec,tDur:R2_TIMER,
         pts:st.pts,diff:st.diff,
         over:st.over,winner:st.winner,answered:st.answered,
         r1phase:st.r1phase,r1timer:st.r1timer,r1tRun:st.r1tRun,
@@ -568,14 +570,15 @@ return(
 }
 
 /* ════════════ CATEGORY GRID (R2/R3) ════════════ */
-function CategoryGrid({cats,onPick,activePlayer}){
+function CategoryGrid({cats,onPick,activePlayer,answererName,isR3}){
 return(
 <div>
     <p className="text-center mb-4">
         <span className={`font-bold text-xl ${activePlayer===1?'text-p1':'text-p2'}`}>
             {activePlayer===1?'🔵':'🔴'} Hráč {activePlayer}
         </span>
-        <span style={{color:'var(--textSub)'}} className="ml-2 text-lg">vyberá okruh</span>
+        <span style={{color:'var(--textSub)'}} className="ml-2 text-lg">{isR3?'vyberá okruh pre':'vyberá okruh'}</span>
+        {isR3&&answererName&&<span className="font-bold text-xl ml-2">{answererName}</span>}
     </p>
     {cats.length===0?<p className="text-center text-accent text-lg font-bold py-8">Všetky okruhy boli použité!</p>:
     <div className="grid grid-cols-2 gap-3">
@@ -602,6 +605,11 @@ const qNum=st.round===1?st.r1qCount+1:st.qNum+1;
 const qTotal=st.round===1?'∞':st.round===2?r2c:r3c;
 const allCats=getCats(st.diff);
 const availCats=allCats.filter(c=>!st.usedCats.includes(c));
+const embIsR3=st.round===3;
+const embPicker=embIsR3?(st.active===1?2:1):st.active;
+const embPickerName=embPicker===1?st.p1?.name:st.p2?.name;
+const embAnswererName=st.active===1?st.p1?.name:st.p2?.name;
+const embShowQ=st.round===1||st.tRun||st.answered||st.passing||st.tSec<R2_TIMER;
 
 if(!st.gameOn&&st.screen!=='results'&&!st.showRoundSummary)return(
     <div className={`h-full flex flex-col items-center justify-center ${isJunior?'junior-bg':'standard-bg'}`}>
@@ -690,10 +698,11 @@ if((st.round===2||st.round===3)&&!st.selCat)return(
         </div>
         <div className="flex-1 flex flex-col items-center justify-center p-4">
             <p className="text-xl mb-4">
-                <span className={`font-bold ${st.active===1?'text-blue-400':'text-red-400'}`}>
-                    {st.active===1?st.p1?.name:st.p2?.name}
+                <span className={`font-bold ${embPicker===1?'text-blue-400':'text-red-400'}`}>
+                    {embPickerName}
                 </span>
-                <span className="text-slate-400 ml-2">vyberá okruh</span>
+                <span className="text-slate-400 ml-2">{embIsR3?'vyberá okruh pre':'vyberá okruh'}</span>
+                {embIsR3&&<span className={`font-bold ml-2 ${st.active===1?'text-blue-400':'text-red-400'}`}>{embAnswererName}</span>}
             </p>
             {availCats.length===0?<p className="text-accent text-xl font-bold py-8">Všetky okruhy použité!</p>:
             <div className="grid grid-cols-2 gap-3 max-w-2xl w-full">
@@ -764,7 +773,7 @@ return(
                 {st.round===1&&<div className="text-center text-sm text-slate-400">{st.r1phase===1?st.p1?.name:st.p2?.name} odpovedá · 10 bodov</div>}
                 {st.round!==1&&st.curQ&&<div className="flex items-center gap-1"><span className="text-accent font-black text-xl">{st.pts}</span><span className="text-slate-400 text-xs">b</span></div>}
                 {st.passing&&<div className="text-center text-yellow-400 font-bold text-sm animate-pulse">⚡ ODPOVEĎ SUPER</div>}
-                {st.curQ?(
+                {embShowQ&&st.curQ?(
                     <div className="anim-slide text-center w-full">
                         <span className={`text-[10px] font-semibold uppercase tracking-widest mb-1 block ${isJunior?'text-purple-400':'text-accent/70'}`}>
                             {CAT_LABELS[st.curQ.category]||st.curQ.category}
@@ -940,9 +949,13 @@ const r1Info=isR1&&(
 );
 
 /* ── Category picker (R2/R3) ── */
+const r3Picker=st.active===1?2:1;
+const catPickerPlayer=isR3?r3Picker:st.active;
+const answererForCat=isR3?(st.active===1?st.p1?.name:st.p2?.name):null;
 const catPicker=(isR2||isR3)&&!st.selCat&&(
     <div className="mt-3">
-        <CategoryGrid cats={availCats} activePlayer={st.active}
+        <CategoryGrid cats={availCats} activePlayer={catPickerPlayer}
+            answererName={answererForCat} isR3={isR3}
             onPick={c=>dp({type:'SEL_CAT',cat:c})}/>
     </div>
 );
@@ -998,10 +1011,14 @@ const questionArea=!isTB&&st.curQ&&(ptsConfirmed||isR1||st.tRun||st.answered||st
             {(isR2||isR3)&&<span className="text-accent font-black text-xl">{st.pts} b</span>}
         </div>
         <p className="text-xl font-semibold mb-4 leading-relaxed">{st.curQ.question}</p>
-        <div className="rounded-xl p-3" style={{background:'var(--card2)'}}>
-            {st.revealed?<p className="text-ok font-bold text-xl">✓ {st.curQ.answer}</p>:
-                <button onClick={()=>dp({type:'REVEAL'})} style={{color:'var(--textSub)'}} className="hover:text-accent transition-colors text-sm">🔒 Zobraziť odpoveď</button>}
+        <div className="rounded-xl p-3 mb-3" style={{background:'var(--card2)'}}>
+            <p className="text-ok font-bold text-xl">✓ {st.curQ.answer}</p>
         </div>
+        {!st.revealed?(
+            <button onClick={()=>dp({type:'REVEAL'})} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-500 hover:to-indigo-500 py-3 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-all">📺 ODKRYŤ NA OBRAZOVKE</button>
+        ):(
+            <p className="text-xs text-accent text-center">✓ Odpoveď zobrazená na TV</p>
+        )}
     </Card>
 );
 
