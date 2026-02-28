@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>DUEL – Moderátor v3</title>
+<title>Vedomostný QUIZ 2026 – Moderátor</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
@@ -50,7 +50,7 @@ accent:'#eab308',p1:'#3b82f6',p2:'#ef4444',ok:'#22c55e',err:'#ef4444',
 <div id="root"></div>
 <script type="text/babel">
 // ================================================================
-//  DUEL v3.1 – Moderátor
+//  Vedomostný QUIZ 2026 – Moderátor
 // ================================================================
 const{useState,useReducer,useContext,createContext,useEffect,useRef,useCallback,useMemo}=React;
 
@@ -90,6 +90,17 @@ const R3_PTS=Array.from({length:36},(_,i)=>i*10);
 const R1_TIME=90;
 const R1_MAX_Q=10;
 const R2_TIMER=10;
+const R2_COUNT=10;
+const R3_COUNT=20;
+const R3_Q_PER_CAT=2; /* 2 otázky na kategóriu v 3. kole */
+const ALL_CATS=['dejiny','veda','sport','kultura','literatura','osobnosti','priroda',
+    'stroje','doplnovacky','presmycky','hudba','film','matematika','historicke_podujatia'];
+/* Náhodne vyber 10 kategórií pre kolo z dostupných */
+function pickRoundCats(diff,n=10){
+    const avail=ALL_CATS.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&q.type!=='tiebreaker'));
+    const shuffled=[...avail].sort(()=>Math.random()-.5);
+    return shuffled.slice(0,n);
+}
 
 /* ─── STORAGE ─── */
 const S={
@@ -119,8 +130,67 @@ return{
         g.gain.setValueAtTime(.2,x.currentTime);o.frequency.linearRampToValueAtTime(80,x.currentTime+.35);
         g.gain.exponentialRampToValueAtTime(.001,x.currentTime+.4);o.start();o.stop(x.currentTime+.4)},
     fanfare(){if(!this.enabled)return;[392,494,587,784,1047].forEach((f,j)=>osc(f,'triangle',.45,.2,j*.13))},
+    gameStart(){if(!this.enabled)return;
+        const scale=[262,294,330,349,392,440,494,523,587,659,784,880,1047];
+        scale.forEach((f,j)=>{osc(f,'sine',.45,.12+j*.014,j*.38);osc(f/2,'triangle',.5,.06,j*.38)});
+        [523,659,784,1047].forEach((f,k)=>osc(f,'sine',1.2,.2,5+k*.04));
+        [262,330,392].forEach(f=>osc(f,'triangle',1.2,.1,5));
+    },
+    roundEnd(){if(!this.enabled)return;
+        [523,659,784,1047,1319].forEach((f,j)=>osc(f,'sine',.35,.16,j*.12));
+        [523,784,1047].forEach(f=>osc(f,'sine',.9,.14,.7));
+        [262,392].forEach(f=>osc(f,'triangle',.9,.08,.7));
+    },
+    winner(){if(!this.enabled)return;
+        const m=[[523,.18],[523,.1],[523,.1],[659,.28],[587,.18],[659,.18],[784,.45]];
+        let t=0;m.forEach(([f,d])=>{osc(f,'sine',d+.1,.22,t);osc(f/2,'triangle',d+.1,.1,t);t+=d+.04});
+        [523,659,784,1047].forEach(f=>{osc(f,'sine',1.5,.17,t);osc(f/2,'triangle',1.5,.08,t)});
+    },
 };
 })();
+
+/* ─── TTS (Text-to-Speech – slovenský hlas) ─── */
+const TTS=(()=>{
+let _on=false,_tmr=null,_vc=null,_audio=null;
+const _pick=()=>{
+    if(_vc)return _vc;
+    const vs=speechSynthesis.getVoices();
+    if(vs.length)console.log('[TTS] Dostupné hlasy:',vs.map(v=>`${v.name} (${v.lang})`).join(', '));
+    /* Priorita: 1) sk-SK mužský, 2) sk-SK akýkoľvek, 3) cs-CZ mužský, 4) cs-CZ akýkoľvek */
+    _vc=vs.find(v=>/^sk[-_]?SK/i.test(v.lang)&&/male|mu[zž]/i.test(v.name))
+        ||vs.find(v=>/^sk/i.test(v.lang))
+        ||vs.find(v=>/^cs/i.test(v.lang)&&/male|mu[zž]|zden[eě]k/i.test(v.name))
+        ||vs.find(v=>/^cs/i.test(v.lang))
+        ||null;
+    if(_vc)console.log('[TTS] Vybraný hlas:',_vc.name,_vc.lang);
+    return _vc;
+};
+if(typeof speechSynthesis!=='undefined'){
+    speechSynthesis.onvoiceschanged=()=>{_vc=null;_pick()};
+    try{speechSynthesis.getVoices();_pick()}catch(e){}
+}
+const speak=(text)=>{
+    if(!_on||!text)return;
+    /* Stop any running audio/speech */
+    _stopCurrent();
+    const u=new SpeechSynthesisUtterance(text);
+    const v=_pick();if(v)u.voice=v;
+    u.lang='sk-SK';u.rate=0.92;u.pitch=0.8;u.volume=1;
+    speechSynthesis.speak(u);
+};
+const after=(fn,ms=2000)=>{_cancelTimer();_tmr=setTimeout(()=>{const t=typeof fn==='function'?fn():fn;speak(t)},ms)};
+const _cancelTimer=()=>{if(_tmr){clearTimeout(_tmr);_tmr=null}};
+const _stopCurrent=()=>{
+    _cancelTimer();
+    if(typeof speechSynthesis!=='undefined')speechSynthesis.cancel();
+    if(_audio){try{_audio.pause();_audio.currentTime=0}catch(e){}_audio=null}
+};
+const stop=_stopCurrent;
+return{get enabled(){return _on},set enabled(v){_on=!!v;if(!v)stop()},speak,after,stop,cancel:_cancelTimer};
+})();
+
+/* ─── SHUFFLE QUESTIONS at load ─── */
+for(let i=QUESTIONS_DB.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[QUESTIONS_DB[i],QUESTIONS_DB[j]]=[QUESTIONS_DB[j],QUESTIONS_DB[i]]}
 
 /* ─── BROADCAST ─── */
 const tvCh=new BroadcastChannel('duel-game');
@@ -138,10 +208,9 @@ let pool=QUESTIONS_DB.filter(q=>q.difficulty===diff&&!usedIds.has(q.id)&&(cat?q.
 if(!pool.length)pool=QUESTIONS_DB.filter(q=>q.difficulty===diff&&(cat?q.category===cat:true)&&(type?q.type===type:q.type!=='tiebreaker'));
 return pool.length?pool[Math.floor(Math.random()*pool.length)]:null;
 }
-function getCats(diff){
-const s=new Set();
-QUESTIONS_DB.filter(q=>q.difficulty===diff&&q.type!=='tiebreaker').forEach(q=>s.add(q.category));
-return[...s];
+function getCats(diff,round,roundCats){
+if(roundCats&&roundCats.length)return roundCats.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&q.type!=='tiebreaker'));
+return ALL_CATS.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&q.type!=='tiebreaker'));
 }
 function applyTheme(t){
 if(t==='light')document.body.classList.add('light');
@@ -162,14 +231,18 @@ tb1:'',tb2:'',
 r1phase:1,r1qCount:0,r1timer:R1_TIME,r1tRun:false,
 showRoundSummary:false,summaryRound:null,
 usedCats:[],
+roundCats:[], /* 10 kategórií pre aktuálne kolo */
+catQCounts:{}, /* R3: koľko otázok už bolo v každej kategórii */
 passing:false, /* "odpoveď super" – opponent answering */
 originalActive:1, /* who originally had the question */
+tbWinner:null, /* víťaz rozstrelu pred zobrazením výsledkov */
+feedback:null, /* 'correct' | 'wrong' | null – TV feedback overlay */
 stats:{r1:{p1c:0,p1w:0,p2c:0,p2w:0},r2:{p1c:0,p1w:0,p2c:0,p2w:0},r3:{p1c:0,p1w:0,p2c:0,p2w:0}},
 };
 
 function reducer(st,a){
-const r2c=st.settings.r2count||10;
-const r3c=st.settings.r3count||20;
+const r2c=R2_COUNT;
+const r3c=R3_COUNT;
 switch(a.type){
 case 'NAV':return{...st,screen:a.to};
 case 'SET_TEST':return{...st,testMode:a.v};
@@ -189,7 +262,21 @@ return{...st,screen:'game',gameOn:true,over:false,
     winner:null,selCat:null,tb1:'',tb2:'',
     r1phase:1,r1qCount:0,r1timer:R1_TIME,r1tRun:false,
     showRoundSummary:false,summaryRound:null,
-    usedCats:[],passing:false,originalActive:1,
+    usedCats:[],roundCats:[],catQCounts:{},passing:false,originalActive:1,tbWinner:null,
+    stats:{r1:{p1c:0,p1w:0,p2c:0,p2w:0},r2:{p1c:0,p1w:0,p2c:0,p2w:0},r3:{p1c:0,p1w:0,p2c:0,p2w:0}}}}
+
+/* ── START GAME at Round 2 ── */
+case 'START_GAME_R2':{
+const u=new Set(getRecentUsedIds());
+const rc2=pickRoundCats(st.diff||'junior',10);
+return{...st,screen:'game',gameOn:true,over:false,
+    round:2,qNum:0,curQ:null,usedIds:u,
+    s1:0,s2:0,active:1,originalActive:1,tRun:false,tSec:R2_TIMER,
+    pts:10,revealed:false,answered:false,
+    winner:null,selCat:null,tb1:'',tb2:'',
+    r1phase:2,r1qCount:0,r1timer:0,r1tRun:false,
+    showRoundSummary:false,summaryRound:null,
+    usedCats:[],roundCats:rc2,catQCounts:{},passing:false,tbWinner:null,
     stats:{r1:{p1c:0,p1w:0,p2c:0,p2w:0},r2:{p1c:0,p1w:0,p2c:0,p2w:0},r3:{p1c:0,p1w:0,p2c:0,p2w:0}}}}
 
 /* ── R1 Timer ── */
@@ -220,7 +307,7 @@ if(st.round===1){
     return{...st,s1:p===1?st.s1+10:st.s1,s2:p===2?st.s2+10:st.s2,answered:true,stats:newStats}
 }
 const pv=st.pts;
-return{...st,s1:p===1?st.s1+pv:st.s1,s2:p===2?st.s2+pv:st.s2,answered:true,tRun:false,passing:false,stats:newStats}
+return{...st,s1:p===1?st.s1+pv:st.s1,s2:p===2?st.s2+pv:st.s2,answered:true,tRun:false,passing:false,stats:newStats,feedback:'correct',revealed:true}
 }
 
 /* ── WRONG ── */
@@ -233,7 +320,7 @@ if(st.round===1){
     return{...st,answered:true,stats:newStats}
 }
 const pv=st.pts;
-return{...st,s1:p===1?st.s1-pv:st.s1,s2:p===2?st.s2-pv:st.s2,answered:true,tRun:false,passing:false,stats:newStats}
+return{...st,s1:p===1?st.s1-pv:st.s1,s2:p===2?st.s2-pv:st.s2,answered:true,tRun:false,passing:false,stats:newStats,feedback:'wrong',revealed:true}
 }
 
 /* ── SKIP (R1 "Ďalej" / no points) ── */
@@ -277,15 +364,21 @@ if(st.round===2){
     return{...st,qNum:nq,curQ:null,usedIds:st.usedIds,active:na,originalActive:na,tRun:false,
         tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,passing:false}
 }
-/* === Round 3 === */
+/* === Round 3 (2 otázky na kategóriu, kategória zmizne po 2) === */
 if(st.round===3){
+    /* Aktualizuj catQCounts pre práve zodpovedanú kategóriu */
+    const cqc={...st.catQCounts};
+    if(st.selCat)cqc[st.selCat]=(cqc[st.selCat]||0)+1;
+    /* Ak kategória dosiahla 2, pridaj do usedCats */
+    const uc=[...st.usedCats];
+    if(st.selCat&&(cqc[st.selCat]||0)>=R3_Q_PER_CAT&&!uc.includes(st.selCat))uc.push(st.selCat);
     const nq=st.qNum+1;
     if(nq>=r3c){
-        return{...st,showRoundSummary:true,summaryRound:3,tRun:false,curQ:null,answered:false,revealed:false,selCat:null,passing:false}
+        return{...st,showRoundSummary:true,summaryRound:3,tRun:false,curQ:null,answered:false,revealed:false,selCat:null,passing:false,catQCounts:cqc,usedCats:uc}
     }
     const na=nq%2===0?2:1;
     return{...st,qNum:nq,curQ:null,usedIds:st.usedIds,active:na,originalActive:na,tRun:false,
-        tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,passing:false}
+        tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,passing:false,catQCounts:cqc,usedCats:uc}
 }
 return st;
 }
@@ -293,12 +386,14 @@ return st;
 /* ── NEXT ROUND (from summary) ── */
 case 'NEXT_ROUND':{
 if(st.summaryRound===1){
+    const rc2=pickRoundCats(st.diff,10);
     return{...st,round:2,qNum:0,curQ:null,active:1,originalActive:1,showRoundSummary:false,summaryRound:null,
-        tRun:false,tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,usedCats:[],passing:false}
+        tRun:false,tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,usedCats:[],roundCats:rc2,catQCounts:{},passing:false}
 }
 if(st.summaryRound===2){
+    const rc3=pickRoundCats(st.diff,10);
     return{...st,round:3,qNum:0,curQ:null,active:2,originalActive:2,showRoundSummary:false,summaryRound:null,
-        tRun:false,tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,usedCats:[],passing:false}
+        tRun:false,tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,usedCats:[],roundCats:rc3,catQCounts:{},passing:false}
 }
 if(st.summaryRound===3){
     if(st.s1===st.s2){
@@ -316,7 +411,8 @@ return st;
 /* ── Category selection (R2/R3) ── */
 case 'SEL_CAT':{
 const u2=new Set(st.usedIds),q=pickQ(st.diff,u2,a.cat);if(q)u2.add(q.id);
-const uc=[...st.usedCats,a.cat];
+/* R2: 1 otázka na kategóriu → hneď odstrániť. R3: 2 otázky → sledujeme cez catQCounts */
+const uc=st.round===2?[...st.usedCats,a.cat]:[...st.usedCats];
 return{...st,curQ:q,usedIds:u2,selCat:a.cat,usedCats:uc}}
 
 /* ── Confirm pts & auto-start timer (R2/R3) ── */
@@ -328,22 +424,55 @@ case 'TB_RESOLVE':{
 const correct=parseFloat(st.curQ.answer),g1=parseFloat(st.tb1),g2=parseFloat(st.tb2);
 const d1=Math.abs(g1-correct),d2=Math.abs(g2-correct);
 let w;if(d1<d2)w=1;else if(d2<d1)w=2;else w=Math.random()<.5?1:2;
-return{...st,over:true,gameOn:false,winner:w,revealed:true,screen:'results'}}
+/* Najprv ukáž víťaza rozstrelu, potom celkový výsledok */
+return{...st,tbWinner:w,winner:w,revealed:true}}
+
+/* ── TB → Go to final results ── */
+case 'TB_TO_RESULTS':
+return{...st,over:true,gameOn:false,screen:'results'}
 
 /* ── Save/End ── */
 case 'SAVE':{
 const r={id:Date.now(),date:st.gameDate,p1:st.p1,p2:st.p2,s1:st.s1,s2:st.s2,
-    diff:st.diff,winner:st.winner===1?st.p1.name:st.p2.name,winnerId:st.winner===1?st.p1.id:st.p2.id,
+    diff:st.diff,winner:st.winner===1?st.p1?.name:st.p2?.name,winnerId:st.winner===1?st.p1?.id:st.p2?.id,
     stats:{...st.stats},usedQIds:[...st.usedIds]};
 const h=[...st.history,r];S.s('history',h);return{...st,history:h}}
 case 'END_GAME':
-return{...st,gameOn:false,over:false,screen:'home',curQ:null,tRun:false,r1tRun:false,testMode:false,showRoundSummary:false,passing:false};
+return{...st,gameOn:false,over:false,screen:'home',curQ:null,tRun:false,r1tRun:false,testMode:false,showRoundSummary:false,passing:false,feedback:null};
+case 'CLEAR_FEEDBACK':return{...st,feedback:null};
 case 'UPD_SETTINGS':{
 const s={...st.settings,...a.s};S.s('settings',s);SFX.enabled=s.sound;
 if(a.s.theme!==undefined)applyTheme(a.s.theme);
 return{...st,settings:s}}
 case 'DEL_HIST':{const h=st.history.filter(x=>x.id!==a.id);S.s('history',h);return{...st,history:h}}
 case 'CLR_HIST':{S.s('history',[]);return{...st,history:[]}}
+
+/* ── JUMP to any round (manual override) ── */
+case 'JUMP_ROUND':{
+const target=a.round; /* 1, 2, 3, or 'tiebreaker' */
+const base={...st,screen:'game',gameOn:true,over:false,winner:null,tbWinner:null,
+    showRoundSummary:false,summaryRound:null,tRun:false,tSec:R2_TIMER,r1tRun:false,
+    selCat:null,usedCats:[],catQCounts:{},pts:10,revealed:false,answered:false,passing:false};
+if(target===1){
+    const u2=new Set(st.usedIds),q=pickQ('junior',u2);if(q)u2.add(q.id);
+    return{...base,round:1,qNum:0,curQ:q,usedIds:u2,active:1,originalActive:1,
+        r1phase:1,r1qCount:0,r1timer:R1_TIME,roundCats:[]}
+}
+if(target===2){
+    const rc2=pickRoundCats(st.diff,10);
+    return{...base,round:2,qNum:0,curQ:null,active:1,originalActive:1,r1phase:2,r1qCount:0,r1timer:0,roundCats:rc2}
+}
+if(target===3){
+    const rc3=pickRoundCats(st.diff,10);
+    return{...base,round:3,qNum:0,curQ:null,active:2,originalActive:2,r1phase:2,r1qCount:0,r1timer:0,roundCats:rc3}
+}
+if(target==='tiebreaker'){
+    const u2=new Set(st.usedIds),q=pickQ(st.diff,u2,null,'tiebreaker');if(q)u2.add(q.id);
+    return{...base,round:'tiebreaker',qNum:0,curQ:q,usedIds:u2,active:1,
+        r1phase:2,r1qCount:0,r1timer:0,tb1:'',tb2:''}
+}
+return st;
+}
 
 /* Force end R1 – fallback when auto-advance fails */
 case 'FORCE_R1_END':
@@ -388,13 +517,22 @@ useEffect(()=>{
     if(st.tSec>3)SFX.tick();else if(st.tSec>0)SFX.tickLow();else if(st.tSec===0)SFX.buzzer();
 },[st.tSec,st.tRun,st.round]);
 
+/* Round-end & winner sounds */
+useEffect(()=>{if(st.showRoundSummary)SFX.roundEnd()},[st.showRoundSummary]);
+useEffect(()=>{if(st.over)SFX.winner()},[st.over]);
+/* Auto-clear feedback overlay after 2.5s */
+useEffect(()=>{
+    if(st.feedback){const t=setTimeout(()=>dp({type:'CLEAR_FEEDBACK'}),2500);return()=>clearTimeout(t)}
+},[st.feedback]);
+
 /* TV sync */
 useEffect(()=>{
     if(st.testMode)return;
     if(!st.gameOn&&st.screen!=='results'&&!st.showRoundSummary){
         sendTV('WAITING',{});return;
     }
-    const allCats=getCats(st.diff);
+    const r2c=R2_COUNT,r3c=R3_COUNT;
+    const allCats=getCats(st.diff,st.round,st.roundCats);
     const availCats=allCats.filter(c=>!st.usedCats.includes(c));
     const showQOnTV=(st.round===1&&st.r1tRun)||st.tRun||st.answered||st.passing||st.tSec<R2_TIMER;
     const r3picker=st.round===3?(st.active===1?2:1):st.active;
@@ -412,10 +550,11 @@ useEffect(()=>{
         r1phase:st.r1phase,r1timer:st.r1timer,r1tRun:st.r1tRun,
         selCat:st.selCat,
         showRoundSummary:st.showRoundSummary,summaryRound:st.summaryRound,
-        stats:st.stats,categories:availCats,usedCats:st.usedCats,
+        stats:st.stats,categories:availCats,usedCats:st.usedCats,catQCounts:st.catQCounts||{},
         passing:st.passing,originalActive:st.originalActive,
-        tb1:st.tb1,tb2:st.tb2,tbQ:st.round==='tiebreaker'&&st.curQ?{question:st.curQ.question,answer:st.revealed?st.curQ.answer:null}:null,
+        tb1:st.tb1,tb2:st.tb2,tbWinner:st.tbWinner,tbQ:st.round==='tiebreaker'&&st.curQ?{question:st.curQ.question,answer:st.revealed?st.curQ.answer:null}:null,
         theme:st.settings.theme||'dark',
+        feedback:st.feedback,
     };
     sendTV('UPDATE',payload);
 });
@@ -441,10 +580,10 @@ function HomeScreen(){
 const{st,dp}=use$();
 return(
 <div className="flex flex-col items-center justify-center min-h-screen gap-6 p-6">
-    <div className="anim-float">
-        <h1 className="text-8xl font-black tracking-tight text-accent mb-2" style={{textShadow:'0 0 60px rgba(234,179,8,.4)'}}>DUEL</h1>
+    <div className="anim-float text-center">
+        <h1 className="text-5xl font-black tracking-tight text-accent mb-2" style={{textShadow:'0 0 60px rgba(234,179,8,.4)'}}>Vedomostný QUIZ 2026</h1>
     </div>
-    <p style={{color:'var(--textSub)'}} className="text-lg mb-8">Vedomostná súťaž pre rodinu</p>
+    <p style={{color:'var(--textSub)'}} className="text-lg mb-8">Rodinná vedomostná súťaž</p>
     <div className="flex flex-col gap-3 w-80">
         <Btn cls="bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 text-lg py-4 shadow-lg shadow-yellow-500/20" onClick={()=>dp({type:'NAV',to:'setup'})}>🎮 Nová hra</Btn>
         <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'players'})}>👤 Hráči</Btn>
@@ -510,7 +649,16 @@ const doStart=(test=false)=>{
     if(!pl1||!pl2)return;
     dp({type:'SETUP',d:{p1:{id:pl1.id,name:pl1.name},p2:{id:pl2.id,name:pl2.name},diff,gameDate:date}});
     dp({type:'SET_TEST',v:test});
+    SFX.gameStart();
     dp({type:'START_GAME'});
+};
+const doStartR2=(test=false)=>{
+    const pl1=st.players.find(p=>p.id===+p1id),pl2=st.players.find(p=>p.id===+p2id);
+    if(!pl1||!pl2)return;
+    dp({type:'SETUP',d:{p1:{id:pl1.id,name:pl1.name},p2:{id:pl2.id,name:pl2.name},diff,gameDate:date}});
+    dp({type:'SET_TEST',v:test});
+    SFX.gameStart();
+    dp({type:'START_GAME_R2'});
 };
 return(
 <div className="max-w-lg mx-auto p-6">
@@ -561,6 +709,7 @@ return(
                 <Btn cls="bg-purple-600 text-white hover:bg-purple-500 py-3 px-5" onClick={()=>doStart(true)} disabled={!canStart}>
                     🧪 Test</Btn>
             </div>
+
         </Card>
     )}
 </div>
@@ -568,7 +717,7 @@ return(
 }
 
 /* ════════════ CATEGORY GRID (R2/R3) ════════════ */
-function CategoryGrid({cats,onPick,activePlayer,answererName,isR3}){
+function CategoryGrid({cats,onPick,activePlayer,answererName,isR3,catQCounts}){
 return(
 <div>
     <p className="text-center mb-4">
@@ -580,15 +729,22 @@ return(
     </p>
     {cats.length===0?<p className="text-center text-accent text-lg font-bold py-8">Všetky okruhy boli použité!</p>:
     <div className="grid grid-cols-2 gap-3">
-        {cats.map(c=>(
+        {cats.map(c=>{
+            const used=catQCounts?.[c]||0;
+            const remaining=isR3?R3_Q_PER_CAT-used:1;
+            return(
             <button key={c} onClick={()=>onPick(c)}
-                className={`cat-card p-5 rounded-2xl border-2 bg-gradient-to-br text-left ${CAT_COLORS[c]||'from-slate-500/20 to-slate-600/5 border-slate-500/50'}`}>
+                className={`cat-card p-5 rounded-2xl border-2 bg-gradient-to-br text-left relative ${CAT_COLORS[c]||'from-slate-500/20 to-slate-600/5 border-slate-500/50'}`}>
                 <div className="flex items-center gap-3">
                     <span className="text-3xl">{CAT_ICONS[c]||'❓'}</span>
                     <span className="font-bold text-base">{CAT_LABELS[c]||c}</span>
                 </div>
+                {isR3&&<span className="absolute top-2 right-3 text-xs font-bold bg-accent/20 text-accent px-2 py-0.5 rounded-lg">
+                    {remaining}/{R3_Q_PER_CAT}
+                </span>}
             </button>
-        ))}
+            );
+        })}
     </div>}
 </div>
 );
@@ -598,10 +754,10 @@ return(
 function EmbeddedTV(){
 const{st}=use$();
 const isJunior=st.diff==='junior';
-const r2c=st.settings.r2count||10,r3c=st.settings.r3count||20;
+const r2c=R2_COUNT,r3c=R3_COUNT;
 const qNum=st.round===1?st.r1qCount+1:st.qNum+1;
 const qTotal=st.round===1?R1_MAX_Q:st.round===2?r2c:r3c;
-const allCats=getCats(st.diff);
+const allCats=getCats(st.diff,st.round,st.roundCats);
 const availCats=allCats.filter(c=>!st.usedCats.includes(c));
 const embIsR3=st.round===3;
 const embPicker=embIsR3?(st.active===1?2:1):st.active;
@@ -611,7 +767,7 @@ const embShowQ=(st.round===1&&st.r1tRun)||st.tRun||st.answered||st.passing||st.t
 
 if(!st.gameOn&&st.screen!=='results'&&!st.showRoundSummary)return(
     <div className={`h-full flex flex-col items-center justify-center ${isJunior?'junior-bg':'standard-bg'}`}>
-        <div className="anim-float"><h1 className="text-6xl font-black text-accent">DUEL</h1></div>
+        <div className="anim-float text-center"><h1 className="text-4xl font-black text-accent">Vedomostný QUIZ 2026</h1></div>
         <p className="text-slate-500 mt-4 text-sm">Čakám na hru…</p>
     </div>
 );
@@ -671,7 +827,25 @@ if(st.over||st.screen==='results'){
 }
 
 /* Tiebreaker */
-if(st.round==='tiebreaker'&&st.curQ)return(
+if(st.round==='tiebreaker'&&st.curQ){
+    const tbWnName=st.tbWinner===1?st.p1?.name:st.tbWinner===2?st.p2?.name:null;
+    if(st.tbWinner)return(
+        <div className={`h-full flex flex-col items-center justify-center ${isJunior?'junior-bg':'standard-bg'}`}>
+            <div className="anim-pop text-center max-w-lg p-4">
+                <div className="text-6xl mb-4">🏆</div>
+                <h2 className="text-xl text-slate-400 mb-2">Víťaz rozstrelu</h2>
+                <h1 className={`text-5xl font-black ${st.tbWinner===1?'text-p1':'text-p2'} mb-4`}>
+                    {st.tbWinner===1?'🔵':'🔴'} {tbWnName}!
+                </h1>
+                {st.revealed&&<p className="text-green-400 font-bold text-lg mb-2">Správna odpoveď: {st.curQ.answer}</p>}
+                <div className="flex items-center justify-center gap-6 text-sm text-slate-400">
+                    <span>🔵 {st.p1?.name}: {st.tb1}</span>
+                    <span>🔴 {st.p2?.name}: {st.tb2}</span>
+                </div>
+            </div>
+        </div>
+    );
+    return(
     <div className={`h-full flex flex-col items-center justify-center ${isJunior?'junior-bg':'standard-bg'}`}>
         <div className="anim-slide text-center max-w-lg p-4">
             <h2 className="text-2xl font-bold text-accent mb-4">⚡ Rozstrel</h2>
@@ -681,14 +855,15 @@ if(st.round==='tiebreaker'&&st.curQ)return(
             {st.revealed&&<p className="text-green-400 font-bold text-lg">Správna odpoveď: {st.curQ.answer}</p>}
         </div>
     </div>
-);
+    );
+}
 
 /* Category picker TV display */
 if((st.round===2||st.round===3)&&!st.selCat)return(
     <div className={`h-full flex flex-col ${isJunior?'junior-bg':'standard-bg'} overflow-auto`}>
         <div className="flex items-center justify-between px-4 py-2 bg-black/30 text-xs">
             <div className="flex items-center gap-2">
-                <span className="text-accent font-black text-sm">DUEL</span>
+                <span className="text-accent font-black text-sm">QUIZ 2026</span>
                 <span className="text-slate-500">│</span>
                 <span className="text-slate-300">{ROUND_NAMES[st.round]}</span>
             </div>
@@ -704,14 +879,21 @@ if((st.round===2||st.round===3)&&!st.selCat)return(
             </p>
             {availCats.length===0?<p className="text-accent text-xl font-bold py-8">Všetky okruhy použité!</p>:
             <div className="grid grid-cols-2 gap-3 max-w-2xl w-full">
-                {availCats.map(c=>(
-                    <div key={c} className={`p-5 rounded-2xl border-2 bg-gradient-to-br ${CAT_COLORS[c]||'from-slate-500/20 to-slate-600/5 border-slate-500/50'}`}>
+                {availCats.map(c=>{
+                    const used=st.catQCounts?.[c]||0;
+                    const remaining=embIsR3?R3_Q_PER_CAT-used:1;
+                    return(
+                    <div key={c} className={`p-5 rounded-2xl border-2 bg-gradient-to-br relative ${CAT_COLORS[c]||'from-slate-500/20 to-slate-600/5 border-slate-500/50'}`}>
                         <div className="flex items-center gap-3">
                             <span className="text-3xl">{CAT_ICONS[c]||'❓'}</span>
                             <span className="font-bold text-lg">{CAT_LABELS[c]||c}</span>
                         </div>
+                        {embIsR3&&<span className="absolute top-2 right-3 text-xs font-bold bg-accent/20 text-accent px-2 py-0.5 rounded-lg">
+                            {remaining}/{R3_Q_PER_CAT}
+                        </span>}
                     </div>
-                ))}
+                    );
+                })}
             </div>}
         </div>
     </div>
@@ -731,7 +913,7 @@ return(
     <div className={`h-full flex flex-col ${isJunior?'junior-bg':'standard-bg'} overflow-hidden`}>
         <div className="flex items-center justify-between px-4 py-2 bg-black/30 text-xs">
             <div className="flex items-center gap-2">
-                <span className="text-accent font-black text-sm">DUEL</span>
+                <span className="text-accent font-black text-sm">QUIZ 2026</span>
                 <span className="text-slate-500">│</span>
                 <span className="text-slate-300">{ROUND_NAMES[st.round]}</span>
             </div>
@@ -745,7 +927,7 @@ return(
                 <div className="text-center"><div className={`text-4xl font-black ${st.s1<0?'text-red-400':'text-p1'}`}>{st.s1}</div></div>
             </div>
             {/* Center */}
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 max-w-lg">
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 max-w-2xl">
                 {/* R1: 90s timer */}
                 {st.round===1&&st.r1tRun&&(
                     <div className="relative flex items-center justify-center">
@@ -773,16 +955,16 @@ return(
                 {st.passing&&<div className="text-center text-yellow-400 font-bold text-sm animate-pulse">⚡ ODPOVEĎ SUPER</div>}
                 {embShowQ&&st.curQ?(
                     <div className="anim-slide text-center w-full">
-                        <span className={`text-[10px] font-semibold uppercase tracking-widest mb-1 block ${isJunior?'text-purple-400':'text-accent/70'}`}>
+                        <span className={`text-base font-semibold uppercase tracking-widest mb-2 block ${isJunior?'text-purple-400':'text-accent/70'}`}>
                             {CAT_LABELS[st.curQ.category]||st.curQ.category}
                         </span>
-                        <div className={`bg-black/40 border ${isJunior?'border-purple-500/30':'border-accent/20'} rounded-xl p-4`}>
-                            <p className="font-bold text-lg leading-snug">{st.curQ.question}</p>
+                        <div className={`bg-black/40 border ${isJunior?'border-purple-500/30':'border-accent/20'} rounded-2xl p-6`}>
+                            <p className="font-bold text-3xl leading-relaxed">{st.curQ.question}</p>
                         </div>
                     </div>
-                ):<div className="text-slate-600 text-sm">Čakám na otázku…</div>}
+                ):<div className="text-slate-600 text-base">Čakám na otázku…</div>}
                 {st.revealed&&st.curQ&&(
-                    <div className="anim-pop"><div className="bg-ok/10 border border-ok/30 rounded-lg px-4 py-2 text-sm"><span className="text-ok font-bold">✓ {st.curQ.answer}</span></div></div>
+                    <div className="anim-pop"><div className="bg-ok/10 border border-ok/30 rounded-xl px-5 py-3"><span className="text-ok font-bold text-xl">✓ {st.curQ.answer}</span></div></div>
                 )}
             </div>
             {/* P2 */}
@@ -798,41 +980,77 @@ return(
 
 /* ════════════ GAME SCREEN ════════════ */
 function GameScreen(){
+/* ═══ ALL HOOKS – MUST be at the very top, NEVER after a conditional return ═══ */
 const{st,dp}=use$();
+const[ptsConfirmed,setPtsConfirmed]=useState(false);
+const[showRoundSwitcher,setShowRoundSwitcher]=useState(false);
+const[ttsOn,setTtsOn]=useState(false);
+const stRef=useRef(st);stRef.current=st;
+const allCats=useMemo(()=>getCats(st.diff,st.round,st.roundCats),[st.diff,st.round,st.roundCats]);
+useEffect(()=>{setPtsConfirmed(false)},[st.qNum,st.round,st.selCat]);
+useEffect(()=>{
+    TTS.enabled=ttsOn;
+    if(ttsOn){/* unlock speech synthesis (Safari) */
+        try{const u=new SpeechSynthesisUtterance('');u.volume=0;speechSynthesis.speak(u);speechSynthesis.cancel()}catch(e){}
+    }
+    return()=>TTS.stop();
+},[ttsOn]);
+/* ═══ END OF HOOKS – no more useState/useEffect/useMemo below this line ═══ */
+
+const openTVWindow=()=>{const L=window.screen.width;window.open('tv.html','QUIZ_TV',`width=1920,height=1080,left=${L},top=0,menubar=no,toolbar=no`)};
 const isTB=st.round==='tiebreaker';
 const isR1=st.round===1;
 const isR2=st.round===2;
 const isR3=st.round===3;
-const r2c=st.settings.r2count||10,r3c=st.settings.r3count||20;
-const qTotal=isR1?R1_MAX_Q:isR2?r2c:r3c;
+const qTotal=isR1?R1_MAX_Q:isR2?R2_COUNT:R3_COUNT;
 const qDisplay=isR1?st.r1qCount+1:st.qNum+1;
-const allCats=useMemo(()=>getCats(st.diff),[st.diff]);
 const availCats=allCats.filter(c=>!st.usedCats.includes(c));
 
-/* R1 action handlers – SYNCHRONOUS: dispatch CORRECT/WRONG/SKIP then NEXT_Q immediately.
-   React 18 batches both into one render. No setTimeout = no race conditions. */
-const r1Correct=()=>{SFX.correct();dp({type:'CORRECT'});dp({type:'NEXT_Q'})};
-const r1Wrong=()=>{SFX.wrong();dp({type:'WRONG'});dp({type:'NEXT_Q'})};
-const r1Skip=()=>{dp({type:'SKIP'});dp({type:'NEXT_Q'})};
-
-/* R2/R3 action handlers */
+/* ── Handlers ── */
+const r1Start=()=>{dp({type:'R1_START'});TTS.speak(st.curQ?.question)};
+const r1Correct=()=>{SFX.correct();dp({type:'CORRECT'});dp({type:'NEXT_Q'});
+    TTS.after(()=>{const s=stRef.current;return s.round===1&&s.r1tRun?s.curQ?.question:null},2000)};
+const r1Wrong=()=>{SFX.wrong();dp({type:'WRONG'});dp({type:'NEXT_Q'});
+    TTS.after(()=>{const s=stRef.current;return s.round===1&&s.r1tRun?s.curQ?.question:null},2000)};
+const r1Skip=()=>{dp({type:'SKIP'});dp({type:'NEXT_Q'});
+    TTS.after(()=>{const s=stRef.current;return s.round===1&&s.r1tRun?s.curQ?.question:null},2000)};
 const r2Correct=()=>{SFX.correct();dp({type:'CORRECT'})};
 const r2Wrong=()=>{SFX.wrong();dp({type:'WRONG'})};
-const r2Super=()=>{dp({type:'PASS_SUPER'})};
+const r2Super=()=>{TTS.stop();dp({type:'PASS_SUPER'})};
+const forceEndR1=()=>{TTS.stop();dp({type:'FORCE_R1_END'})};
+const jumpTo=(r)=>{
+    TTS.stop();
+    dp({type:'JUMP_ROUND',round:r});
+    setShowRoundSwitcher(false);
+};
 
-/* Force end R1 – fallback button */
-const forceEndR1=()=>dp({type:'FORCE_R1_END'});
+/* ── Reusable jump buttons ── */
+const jumpBtns=(
+    <div className="mt-4 flex flex-wrap gap-2 justify-center">
+        <span className="text-xs w-full text-center mb-1" style={{color:'var(--textSub)'}}>Preskočiť na:</span>
+        <Btn cls="text-xs py-1 px-3 hover:opacity-80" style={{background:'var(--card2)'}} onClick={()=>jumpTo(1)}>⚡ 1. kolo</Btn>
+        <Btn cls="text-xs py-1 px-3 hover:opacity-80" style={{background:'var(--card2)'}} onClick={()=>jumpTo(2)}>🎯 2. kolo</Btn>
+        <Btn cls="text-xs py-1 px-3 hover:opacity-80" style={{background:'var(--card2)'}} onClick={()=>jumpTo(3)}>🏁 3. kolo</Btn>
+        <Btn cls="text-xs py-1 px-3 hover:opacity-80" style={{background:'var(--card2)'}} onClick={()=>jumpTo('tiebreaker')}>⚔️ Rozstrel</Btn>
+    </div>
+);
 
-/* ── STUCK DETECTION: if R1 should be over but summary isn't showing ── */
+/* ── Stuck detection ── */
 const r1StuckDetected=isR1&&!st.showRoundSummary&&!st.r1tRun&&(
-    (st.r1phase===2&&(st.r1timer<=0||st.r1qCount>=R1_MAX_Q-1&&st.answered))||
+    (st.r1phase===2&&(st.r1timer<=0||(st.r1qCount>=R1_MAX_Q-1&&st.answered)))||
     (!st.curQ&&!st.answered)
 );
+
+/* ═══════════════════════════════════════════════════════
+   DETERMINE WHAT TO SHOW (no early returns!)
+   ═══════════════════════════════════════════════════════ */
+
+let gameView=null;
+
+/* ── A) R1 Stuck Recovery ── */
 if(r1StuckDetected){
-    /* Auto-recover: show round summary directly */
-    const rs=st.stats;
-    const rd=rs.r1;
-    const content=(
+    const rd=st.stats.r1;
+    gameView=(
         <div className="flex flex-col items-center justify-center min-h-[60vh] p-6">
             <div className="anim-pop text-center">
                 <h2 className="text-2xl font-bold mb-1" style={{color:'var(--textSub)'}}>Koniec 1. kola</h2>
@@ -854,32 +1072,20 @@ if(r1StuckDetected){
                 {st.s2>st.s1&&<p className="text-p2 font-bold text-lg mb-4">🔴 {st.p2?.name} vedie!</p>}
                 {st.s1===st.s2&&<p className="text-accent font-bold text-lg mb-4">⚖️ Remíza!</p>}
                 <Btn cls="bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 text-lg py-3 px-8 shadow-lg shadow-yellow-500/20"
-                    onClick={()=>{dp({type:'FORCE_R1_END'});dp({type:'NEXT_ROUND'})}}>
+                    onClick={()=>jumpTo(2)}>
                     ▶ Pokračovať do 2. kola
                 </Btn>
+                {jumpBtns}
             </div>
         </div>
     );
-    if(st.testMode)return(
-        <div className="h-screen flex flex-col">
-            <div className="bg-purple-900/50 border-b border-purple-500/30 px-4 py-1 flex items-center justify-between">
-                <span className="text-purple-300 font-bold text-sm">🧪 TESTOVACÍ REŽIM</span>
-            </div>
-            <div className="flex-1 flex overflow-hidden">
-                <div className="w-1/2 flex items-center justify-center overflow-y-auto" style={{background:'var(--bg)'}}>{content}</div>
-                <div className="w-1/2"><EmbeddedTV/></div>
-            </div>
-        </div>
-    );
-    return <div className="min-h-screen flex items-center justify-center">{content}</div>;
 }
 
-/* ── ROUND SUMMARY VIEW ── */
-if(st.showRoundSummary){
-    const rs=st.stats;
+/* ── B) Round Summary ── */
+else if(st.showRoundSummary){
     const rk=st.summaryRound===1?'r1':st.summaryRound===2?'r2':'r3';
-    const rd=rs[rk];
-    const content=(
+    const rd=st.stats[rk]||{p1c:0,p1w:0,p2c:0,p2w:0};
+    gameView=(
         <div className="flex flex-col items-center justify-center min-h-[60vh] p-6">
             <div className="anim-pop text-center">
                 <h2 className="text-2xl font-bold mb-1" style={{color:'var(--textSub)'}}>Koniec {st.summaryRound}. kola</h2>
@@ -904,251 +1110,299 @@ if(st.showRoundSummary){
                     onClick={()=>dp({type:'NEXT_ROUND'})}>
                     {st.summaryRound<3?`▶ Pokračovať do ${st.summaryRound+1}. kola`:'🏁 Výsledky'}
                 </Btn>
+                {jumpBtns}
             </div>
         </div>
     );
-    if(st.testMode)return(
-        <div className="h-screen flex flex-col">
-            <div className="bg-purple-900/50 border-b border-purple-500/30 px-4 py-1 flex items-center justify-between">
-                <span className="text-purple-300 font-bold text-sm">🧪 TESTOVACÍ REŽIM</span>
-            </div>
-            <div className="flex-1 flex overflow-hidden">
-                <div className="w-1/2 flex items-center justify-center overflow-y-auto" style={{background:'var(--bg)'}}>{content}</div>
-                <div className="w-1/2"><EmbeddedTV/></div>
-            </div>
-        </div>
-    );
-    return <div className="min-h-screen flex items-center justify-center">{content}</div>;
 }
 
-/* ── HEADER ── */
-const header=(
-    <div className="px-4 py-2 flex items-center justify-between border-b" style={{background:'var(--card)',borderColor:'var(--border)'}}>
-        <div className="flex items-center gap-4">
-            <button onClick={()=>{if(confirm('Ukončiť hru?'))dp({type:'END_GAME'})}}
-                style={{color:'var(--textSub)'}} className="hover:text-red-400 text-sm">✕ Koniec</button>
-            {st.testMode&&<span className="bg-purple-600/30 text-purple-300 text-xs px-2 py-0.5 rounded-lg font-bold">🧪 TEST</span>}
-            <span className="text-accent font-bold">{typeof st.round==='number'?`Kolo ${st.round}/3: `:''}{ROUND_NAMES[st.round]}</span>
-            {isR1&&<span className="text-sm" style={{color:'var(--textSub)'}}>Fáza: {st.r1phase===1?st.p1?.name:st.p2?.name}</span>}
-            {!isR1&&!isTB&&<span style={{color:'var(--textSub)'}} className="text-sm">Otázka {qDisplay}/{qTotal}</span>}
-        </div>
-        <div className="flex items-center gap-3">
-            {st.testMode&&<Btn cls="text-xs py-1 px-2" style={{background:'var(--card2)'}} onClick={()=>dp({type:'SET_TEST',v:false})}>📺 Produkcia</Btn>}
-            <span className="text-sm" style={{color:'var(--textSub)'}}>{DIFF_LABELS[st.diff]}</span>
-        </div>
-    </div>
-);
-
-/* ── Player Card ── */
-const playerCard=(num,name,score,isActive)=>{
-const isActiveAndR1=isR1&&isActive&&!st.answered;
-const isActiveR23=(isR2||isR3)&&isActive&&st.curQ&&!st.answered;
-return(
-    <div className={`rounded-2xl p-4 border-2 transition-all duration-300 ${
-        isActive?(num===1?'border-p1 bg-blue-500/10 shadow-lg shadow-blue-500/20':'border-p2 bg-red-500/10 shadow-lg shadow-red-500/20')
-        :''}`} style={!isActive?{background:'var(--card)',borderColor:'var(--border)'}:{}}>
-        <div className="flex items-center gap-2 mb-2">
-            <span className={`w-3 h-3 rounded-full ${num===1?'bg-p1':'bg-p2'} ${isActive?'animate-pulse':''}`}/>
-            <span className="font-bold">{name}</span>
-            {isActive&&<span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-lg font-bold">ODPOVEDÁ</span>}
-            {st.passing&&isActive&&<span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-lg font-bold">SUPER</span>}
-        </div>
-        <div className={`text-4xl font-black ${score<0?'text-red-400':num===1?'text-p1':'text-p2'}`}>{score}</div>
-        <div className="text-xs" style={{color:'var(--textSub)'}}>bodov</div>
-        {/* R1 controls */}
-        {isActiveAndR1&&st.r1tRun&&(
-            <div className="flex gap-2 mt-3 flex-wrap">
-                <Btn cls="bg-ok/20 text-ok hover:bg-ok/30 text-sm py-2 px-3 flex-1" onClick={r1Correct}>✓ Správne</Btn>
-                <Btn cls="bg-red-500/20 text-red-400 hover:bg-red-500/30 text-sm py-2 px-3 flex-1" onClick={r1Wrong}>✗ Zle</Btn>
-                <Btn cls="text-sm py-2 px-3 flex-1" style={{background:'var(--card2)',color:'var(--textSub)'}} onClick={r1Skip}>→ Ďalej</Btn>
-            </div>
-        )}
-        {/* R2/R3 controls */}
-        {isActiveR23&&(
-            <div className="flex gap-2 mt-3 flex-wrap">
-                <Btn cls="bg-ok/20 text-ok hover:bg-ok/30 text-sm py-2 px-3 flex-1" onClick={r2Correct}>✓ Správne</Btn>
-                <Btn cls="bg-red-500/20 text-red-400 hover:bg-red-500/30 text-sm py-2 px-3 flex-1" onClick={r2Wrong}>✗ Zle</Btn>
-                {!st.passing&&<Btn cls="bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 text-sm py-2 px-3 flex-1" onClick={r2Super}>⚡ Super</Btn>}
-            </div>
-        )}
-    </div>
-);
-};
-
-/* ── R1 info bar with timer ── */
-const r1Info=isR1&&(
-    <div className="mt-3 p-4 rounded-xl border" style={{background:'var(--card)',borderColor:'var(--border)'}}>
-        <div className="flex items-center justify-between">
-            <div>
-                <p className="text-lg font-bold">
-                    <span className={st.active===1?'text-p1':'text-p2'}>{st.active===1?st.p1?.name:st.p2?.name}</span>
-                    <span style={{color:'var(--textSub)'}} className="ml-2 text-sm">· 10 bodov za správnu</span>
-                </p>
-                <p className="text-xs mt-1" style={{color:'var(--textSub)'}}>Otázka {st.r1qCount+1} / {R1_MAX_Q}</p>
+/* ── C) Normal Game ── */
+else{
+    /* Header */
+    const header=(
+        <div className="px-4 py-2 flex items-center justify-between border-b" style={{background:'var(--card)',borderColor:'var(--border)'}}>
+            <div className="flex items-center gap-4">
+                <button onClick={()=>{if(confirm('Ukončiť hru?')){TTS.stop();dp({type:'END_GAME'})}}}
+                    style={{color:'var(--textSub)'}} className="hover:text-red-400 text-sm">✕ Koniec</button>
+                {st.testMode&&<span className="bg-purple-600/30 text-purple-300 text-xs px-2 py-0.5 rounded-lg font-bold">🧪 TEST</span>}
+                <span className="text-accent font-bold">{typeof st.round==='number'?`Kolo ${st.round}/3: `:''}{ROUND_NAMES[st.round]}</span>
+                {isR1&&<span className="text-sm" style={{color:'var(--textSub)'}}>Fáza: {st.r1phase===1?st.p1?.name:st.p2?.name}</span>}
+                {!isR1&&!isTB&&<span style={{color:'var(--textSub)'}} className="text-sm">Otázka {qDisplay}/{qTotal}</span>}
             </div>
             <div className="flex items-center gap-3">
-                <div className={`text-4xl font-black ${st.r1timer<=10?'text-red-400':st.r1timer<=20?'text-yellow-400':'text-accent'}`}>
-                    {st.r1timer}s
+                {st.testMode&&<Btn cls="text-xs py-1 px-2" style={{background:'var(--card2)'}} onClick={()=>dp({type:'SET_TEST',v:false})}>📺 Produkcia</Btn>}
+                {!st.testMode&&<Btn cls="text-xs py-1 px-2 hover:opacity-80" style={{background:'var(--card2)'}} onClick={openTVWindow}>🖥️ TV okno</Btn>}
+                <Btn cls={`text-xs py-1 px-2 ${ttsOn?'bg-accent text-black font-bold':'hover:opacity-80'}`}
+                    style={!ttsOn?{background:'var(--card2)'}:{}} onClick={()=>setTtsOn(v=>!v)}>
+                    {ttsOn?'🔊 TTS':'🔇 TTS'}</Btn>
+                <span className="text-sm" style={{color:'var(--textSub)'}}>{DIFF_LABELS[st.diff]}</span>
+            </div>
+        </div>
+    );
+
+    /* Player Card */
+    const playerCard=(num,name,score,isActive)=>{
+    const isActiveAndR1=isR1&&isActive&&!st.answered;
+    const isActiveR23=(isR2||isR3)&&isActive&&st.curQ&&!st.answered;
+    return(
+        <div className={`rounded-2xl p-4 border-2 transition-all duration-300 ${
+            isActive?(num===1?'border-p1 bg-blue-500/10 shadow-lg shadow-blue-500/20':'border-p2 bg-red-500/10 shadow-lg shadow-red-500/20')
+            :''}`} style={!isActive?{background:'var(--card)',borderColor:'var(--border)'}:{}}>
+            <div className="flex items-center gap-2 mb-2">
+                <span className={`w-3 h-3 rounded-full ${num===1?'bg-p1':'bg-p2'} ${isActive?'animate-pulse':''}`}/>
+                <span className="font-bold">{name}</span>
+                {isActive&&<span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-lg font-bold">ODPOVEDÁ</span>}
+                {st.passing&&isActive&&<span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-lg font-bold">SUPER</span>}
+            </div>
+            <div className={`text-4xl font-black ${score<0?'text-red-400':num===1?'text-p1':'text-p2'}`}>{score}</div>
+            <div className="text-xs" style={{color:'var(--textSub)'}}>bodov</div>
+            {isActiveAndR1&&st.r1tRun&&(
+                <div className="flex gap-2 mt-3 flex-wrap">
+                    <Btn cls="bg-ok/20 text-ok hover:bg-ok/30 text-sm py-2 px-3 flex-1" onClick={r1Correct}>✓ Správne</Btn>
+                    <Btn cls="bg-red-500/20 text-red-400 hover:bg-red-500/30 text-sm py-2 px-3 flex-1" onClick={r1Wrong}>✗ Zle</Btn>
+                    <Btn cls="text-sm py-2 px-3 flex-1" style={{background:'var(--card2)',color:'var(--textSub)'}} onClick={r1Skip}>→ Ďalej</Btn>
                 </div>
-                {!st.r1tRun&&<Btn cls="bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 py-2 px-4 text-lg" onClick={()=>dp({type:'R1_START'})}>▶ Štart</Btn>}
-            </div>
+            )}
+            {isActiveR23&&(
+                <div className="flex gap-2 mt-3 flex-wrap">
+                    <Btn cls="bg-ok/20 text-ok hover:bg-ok/30 text-sm py-2 px-3 flex-1" onClick={r2Correct}>✓ Správne</Btn>
+                    <Btn cls="bg-red-500/20 text-red-400 hover:bg-red-500/30 text-sm py-2 px-3 flex-1" onClick={r2Wrong}>✗ Zle</Btn>
+                    {!st.passing&&<Btn cls="bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 text-sm py-2 px-3 flex-1" onClick={r2Super}>⚡ Super</Btn>}
+                </div>
+            )}
         </div>
-        {st.r1tRun&&(
-            <div className="mt-2 h-2 rounded-full overflow-hidden" style={{background:'var(--card2)'}}>
-                <div className="h-full rounded-full timeline-bar" style={{width:((st.r1timer/R1_TIME)*100)+'%',background:st.r1timer<=10?'#ef4444':st.r1timer<=20?'#eab308':'#22c55e'}}/>
-            </div>
-        )}
-        {/* Fallback: manual End-R1 button – always visible during R1 */}
-        <div className="mt-2 flex justify-end">
-            <Btn cls="bg-red-600/20 text-red-400 hover:bg-red-600/40 text-xs py-1 px-3" onClick={forceEndR1}>
-                ⏹ Ukončiť kolo
-            </Btn>
-        </div>
-    </div>
-);
+    );
+    };
 
-/* ── Category picker (R2/R3) ── */
-const r3Picker=st.active===1?2:1;
-const catPickerPlayer=isR3?r3Picker:st.active;
-const answererForCat=isR3?(st.active===1?st.p1?.name:st.p2?.name):null;
-const catPicker=(isR2||isR3)&&!st.selCat&&(
-    <div className="mt-3">
-        <CategoryGrid cats={availCats} activePlayer={catPickerPlayer}
-            answererName={answererForCat} isR3={isR3}
-            onPick={c=>dp({type:'SEL_CAT',cat:c})}/>
-    </div>
-);
-
-/* ── Point picker (R2/R3, after category selected, before timer) ── */
-const[ptsConfirmed,setPtsConfirmed]=useState(false);
-useEffect(()=>{setPtsConfirmed(false)},[st.qNum,st.round,st.selCat]);
-const ptsPicker=(isR2||isR3)&&st.selCat&&!st.tRun&&!ptsConfirmed&&!st.answered&&!st.passing&&(
-    <Card cls="mt-3">
-        <p className="text-lg mb-3 font-semibold">
-            <span className={st.active===1?'text-p1':'text-p2'}>{st.active===1?st.p1?.name:st.p2?.name}</span>
-            <span style={{color:'var(--textSub)'}} className="ml-2">stávka bodov:</span>
-        </p>
-        {isR2?(
-            <div className="flex gap-2">
-                {R2_PTS.map(v=>(
-                    <button key={v} onClick={()=>dp({type:'SET_PTS',v})}
-                        className={`flex-1 py-4 rounded-xl font-black text-xl transition-all ${st.pts===v?'bg-accent text-black scale-105 shadow-lg shadow-yellow-500/20':''}`}
-                        style={st.pts!==v?{background:'var(--card2)'}:{}}>{v}</button>
-                ))}
-            </div>
-        ):(
-            <div>
+    /* R1 info bar */
+    const r1Info=isR1&&(
+        <div className="mt-3 p-4 rounded-xl border" style={{background:'var(--card)',borderColor:'var(--border)'}}>
+            <div className="flex items-center justify-between">
+                <div>
+                    <p className="text-lg font-bold">
+                        <span className={st.active===1?'text-p1':'text-p2'}>{st.active===1?st.p1?.name:st.p2?.name}</span>
+                        <span style={{color:'var(--textSub)'}} className="ml-2 text-sm">· 10 bodov za správnu</span>
+                    </p>
+                    <p className="text-xs mt-1" style={{color:'var(--textSub)'}}>Otázka {st.r1qCount+1} / {R1_MAX_Q}</p>
+                </div>
                 <div className="flex items-center gap-3">
-                    <input type="range" min="0" max="350" step="10" value={st.pts}
-                        onChange={e=>dp({type:'SET_PTS',v:+e.target.value})}
-                        className="flex-1 accent-yellow-400 h-3"/>
-                    <span className="text-accent font-black text-4xl w-20 text-center">{st.pts}</span>
+                    <div className={`text-4xl font-black ${st.r1timer<=10?'text-red-400':st.r1timer<=20?'text-yellow-400':'text-accent'}`}>
+                        {st.r1timer}s
+                    </div>
+                    {!st.r1tRun&&<Btn cls="bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 py-2 px-4 text-lg" onClick={r1Start}>▶ Štart</Btn>}
                 </div>
-                <div className="flex flex-wrap gap-1 mt-2">
-                    {[0,50,100,150,200,250,300,350].map(v=>(
+            </div>
+            {st.r1tRun&&(
+                <div className="mt-2 h-2 rounded-full overflow-hidden" style={{background:'var(--card2)'}}>
+                    <div className="h-full rounded-full timeline-bar" style={{width:((st.r1timer/R1_TIME)*100)+'%',background:st.r1timer<=10?'#ef4444':st.r1timer<=20?'#eab308':'#22c55e'}}/>
+                </div>
+            )}
+            <div className="mt-2 flex justify-end">
+                <Btn cls="bg-red-600/20 text-red-400 hover:bg-red-600/40 text-xs py-1 px-3" onClick={forceEndR1}>
+                    ⏹ Ukončiť kolo
+                </Btn>
+            </div>
+        </div>
+    );
+
+    /* Category picker */
+    const r3Picker=st.active===1?2:1;
+    const catPickerPlayer=isR3?r3Picker:st.active;
+    const answererForCat=isR3?(st.active===1?st.p1?.name:st.p2?.name):null;
+    const catPicker=(isR2||isR3)&&!st.selCat&&(
+        <div className="mt-3">
+            <CategoryGrid cats={availCats} activePlayer={catPickerPlayer}
+                answererName={answererForCat} isR3={isR3}
+                catQCounts={st.catQCounts}
+                onPick={c=>dp({type:'SEL_CAT',cat:c})}/>
+        </div>
+    );
+
+    /* Point picker */
+    const ptsPicker=(isR2||isR3)&&st.selCat&&!st.tRun&&!ptsConfirmed&&!st.answered&&!st.passing&&(
+        <Card cls="mt-3">
+            <p className="text-lg mb-3 font-semibold">
+                <span className={st.active===1?'text-p1':'text-p2'}>{st.active===1?st.p1?.name:st.p2?.name}</span>
+                <span style={{color:'var(--textSub)'}} className="ml-2">stávka bodov:</span>
+            </p>
+            {isR2?(
+                <div className="flex gap-2">
+                    {R2_PTS.map(v=>(
                         <button key={v} onClick={()=>dp({type:'SET_PTS',v})}
-                            className={`px-3 py-1 rounded-lg text-sm font-bold ${st.pts===v?'bg-accent text-black':'hover:opacity-80'}`}
+                            className={`flex-1 py-4 rounded-xl font-black text-xl transition-all ${st.pts===v?'bg-accent text-black scale-105 shadow-lg shadow-yellow-500/20':''}`}
                             style={st.pts!==v?{background:'var(--card2)'}:{}}>{v}</button>
                     ))}
                 </div>
+            ):(
+                <div>
+                    <div className="flex items-center gap-3">
+                        <input type="range" min="0" max="350" step="10" value={st.pts}
+                            onChange={e=>dp({type:'SET_PTS',v:+e.target.value})}
+                            className="flex-1 accent-yellow-400 h-3"/>
+                        <span className="text-accent font-black text-4xl w-20 text-center">{st.pts}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                        {[0,50,100,150,200,250,300,350].map(v=>(
+                            <button key={v} onClick={()=>dp({type:'SET_PTS',v})}
+                                className={`px-3 py-1 rounded-lg text-sm font-bold ${st.pts===v?'bg-accent text-black':'hover:opacity-80'}`}
+                                style={st.pts!==v?{background:'var(--card2)'}:{}}>{v}</button>
+                        ))}
+                    </div>
+                </div>
+            )}
+            <Btn cls="mt-3 w-full bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 py-3 text-lg"
+                onClick={()=>{setPtsConfirmed(true);dp({type:'CONFIRM_PTS'});TTS.speak(st.curQ?.question)}}>
+                ▶ Potvrdiť a spustiť čas ({R2_TIMER}s)</Btn>
+        </Card>
+    );
+
+    /* Question area */
+    const questionArea=!isTB&&st.curQ&&(ptsConfirmed||isR1||st.tRun||st.answered||st.passing)&&(
+        <Card cls="mt-3 anim-slide">
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                    <span className="text-2xl">{CAT_ICONS[st.curQ.category]||'❓'}</span>
+                    <span className="text-accent text-base font-bold uppercase tracking-wider">{CAT_LABELS[st.curQ.category]||st.curQ.category}</span>
+                </div>
+                {(isR2||isR3)&&<span className="text-accent font-black text-xl">{st.pts} b</span>}
             </div>
-        )}
-        <Btn cls="mt-3 w-full bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 py-3 text-lg"
-            onClick={()=>{setPtsConfirmed(true);dp({type:'CONFIRM_PTS'})}}>
-            ▶ Potvrdiť a spustiť čas ({R2_TIMER}s)</Btn>
-    </Card>
-);
-
-/* ── Question area ── */
-const questionArea=!isTB&&st.curQ&&(ptsConfirmed||isR1||st.tRun||st.answered||st.passing)&&(
-    <Card cls="mt-3 anim-slide">
-        <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-                <span className="text-2xl">{CAT_ICONS[st.curQ.category]||'❓'}</span>
-                <span className="text-accent text-base font-bold uppercase tracking-wider">{CAT_LABELS[st.curQ.category]||st.curQ.category}</span>
+            <p className="text-xl font-semibold mb-4 leading-relaxed">{st.curQ.question}</p>
+            <div className="rounded-xl p-3 mb-3" style={{background:'var(--card2)'}}>
+                <p className="text-ok font-bold text-xl">✓ {st.curQ.answer}</p>
             </div>
-            {(isR2||isR3)&&<span className="text-accent font-black text-xl">{st.pts} b</span>}
-        </div>
-        <p className="text-xl font-semibold mb-4 leading-relaxed">{st.curQ.question}</p>
-        <div className="rounded-xl p-3 mb-3" style={{background:'var(--card2)'}}>
-            <p className="text-ok font-bold text-xl">✓ {st.curQ.answer}</p>
-        </div>
-        {!st.revealed?(
-            <button onClick={()=>dp({type:'REVEAL'})} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-500 hover:to-indigo-500 py-3 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-all">📺 ODKRYŤ NA OBRAZOVKE</button>
-        ):(
-            <p className="text-xs text-accent text-center">✓ Odpoveď zobrazená na TV</p>
-        )}
-    </Card>
-);
+            {!st.revealed?(
+                <button onClick={()=>dp({type:'REVEAL'})} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-500 hover:to-indigo-500 py-3 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-all">📺 ODKRYŤ NA OBRAZOVKE</button>
+            ):(
+                <p className="text-xs text-accent text-center">✓ Odpoveď zobrazená na TV</p>
+            )}
+        </Card>
+    );
 
-/* ── Timer display (R2/R3) ── */
-const timerColor=st.tSec<=3?'text-red-400':st.tSec<=6?'text-yellow-400':'text-accent';
-const timerDisplay=(isR2||isR3)&&!isTB&&st.curQ&&(st.tRun||st.tSec<R2_TIMER||st.answered)&&(
-    <div className="mt-3 flex items-center gap-3">
-        <span className="text-sm" style={{color:'var(--textSub)'}}>Čas:</span>
-        <span className={`text-4xl font-black w-14 text-center ${timerColor}`}>{st.tSec}</span>
-        {st.passing&&<span className="text-yellow-400 font-bold text-sm">⚡ ODPOVEĎ SUPER</span>}
-    </div>
-);
-
-/* ── Next button (all rounds) ── */
-const nextBtn=!isTB&&(
-    <div className="mt-3 flex gap-2">
-        {!isR1&&<Btn cls="bg-slate-600/30 hover:bg-slate-600/50 text-sm py-2" style={{color:'var(--textSub)'}} onClick={()=>dp({type:'SKIP'})} disabled={st.answered}>⊘ Bez bodov</Btn>}
-        <Btn cls="bg-accent/20 text-accent hover:bg-accent/30 text-sm py-2 flex-1" onClick={()=>dp({type:'NEXT_Q'})} disabled={!st.answered}>
-            Ďalšia otázka →</Btn>
-    </div>
-);
-
-/* ── Tiebreaker ── */
-const tbUI=isTB&&st.curQ&&(
-    <Card cls="mt-3 space-y-4">
-        <div className="text-center">
-            <span className="text-3xl">⚡</span>
-            <h3 className="text-xl font-bold text-accent">Rozstrel</h3>
-            <p className="text-sm" style={{color:'var(--textSub)'}}>Jedna otázka – najbližšia odpoveď vyhráva!</p>
+    /* Timer display */
+    const timerColor=st.tSec<=3?'text-red-400':st.tSec<=6?'text-yellow-400':'text-accent';
+    const timerDisplay=(isR2||isR3)&&!isTB&&st.curQ&&(st.tRun||st.tSec<R2_TIMER||st.answered)&&(
+        <div className="mt-3 flex items-center gap-3">
+            <span className="text-sm" style={{color:'var(--textSub)'}}>Čas:</span>
+            <span className={`text-4xl font-black w-14 text-center ${timerColor}`}>{st.tSec}</span>
+            {st.passing&&<span className="text-yellow-400 font-bold text-sm">⚡ ODPOVEĎ SUPER</span>}
         </div>
-        <div className="rounded-xl p-4 border" style={{background:'var(--card2)',borderColor:'var(--border)'}}>
-            <p className="text-xs mb-1" style={{color:'var(--textSub)'}}>{CAT_LABELS[st.curQ.category]||st.curQ.category}</p>
-            <p className="text-xl font-bold">{st.curQ.question}</p>
+    );
+
+    /* Next button */
+    const nextBtn=!isTB&&(
+        <div className="mt-3 flex gap-2">
+            {!isR1&&<Btn cls="bg-slate-600/30 hover:bg-slate-600/50 text-sm py-2" style={{color:'var(--textSub)'}} onClick={()=>dp({type:'SKIP'})} disabled={st.answered}>⊘ Bez bodov</Btn>}
+            <Btn cls="bg-accent/20 text-accent hover:bg-accent/30 text-sm py-2 flex-1" onClick={()=>dp({type:'NEXT_Q'})} disabled={!st.answered}>
+                Ďalšia otázka →</Btn>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-            <div>
-                <label className="text-p1 text-sm font-bold block mb-1">🔵 {st.p1.name}</label>
-                <input type="number" value={st.tb1} onChange={e=>dp({type:'TB_GUESS',p:1,v:e.target.value})}
-                    className="w-full rounded-xl px-3 py-2 outline-none focus:ring-2 ring-p1" style={{background:'var(--inputBg)',color:'var(--text)'}}/>
+    );
+
+    /* Tiebreaker */
+    const tbWn=st.tbWinner===1?st.p1?.name:st.tbWinner===2?st.p2?.name:null;
+    const tbUI=isTB&&st.curQ&&(
+        <Card cls="mt-3 space-y-4">
+            <div className="text-center">
+                <span className="text-3xl">⚡</span>
+                <h3 className="text-xl font-bold text-accent">Rozstrel</h3>
+                <p className="text-sm" style={{color:'var(--textSub)'}}>Jedna otázka – najbližšia odpoveď vyhráva!</p>
             </div>
-            <div>
-                <label className="text-p2 text-sm font-bold block mb-1">🔴 {st.p2.name}</label>
-                <input type="number" value={st.tb2} onChange={e=>dp({type:'TB_GUESS',p:2,v:e.target.value})}
-                    className="w-full rounded-xl px-3 py-2 outline-none focus:ring-2 ring-p2" style={{background:'var(--inputBg)',color:'var(--text)'}}/>
+            <div className="rounded-xl p-4 border" style={{background:'var(--card2)',borderColor:'var(--border)'}}>
+                <p className="text-xs mb-1" style={{color:'var(--textSub)'}}>{CAT_LABELS[st.curQ?.category]||st.curQ?.category}</p>
+                <p className="text-xl font-bold">{st.curQ?.question}</p>
+            </div>
+            {/* Správna odpoveď pre moderátora – vždy viditeľná */}
+            <div className="rounded-xl p-3 border border-ok/30" style={{background:'var(--card2)'}}>
+                <p className="text-ok font-bold text-lg">✓ Správna odpoveď: {st.curQ?.answer}</p>
+            </div>
+            {!st.tbWinner?(
+            <>
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="text-p1 text-sm font-bold block mb-1">🔵 {st.p1?.name}</label>
+                    <input type="number" value={st.tb1} onChange={e=>dp({type:'TB_GUESS',p:1,v:e.target.value})}
+                        className="w-full rounded-xl px-3 py-2 outline-none focus:ring-2 ring-p1" style={{background:'var(--inputBg)',color:'var(--text)'}}/>
+                </div>
+                <div>
+                    <label className="text-p2 text-sm font-bold block mb-1">🔴 {st.p2?.name}</label>
+                    <input type="number" value={st.tb2} onChange={e=>dp({type:'TB_GUESS',p:2,v:e.target.value})}
+                        className="w-full rounded-xl px-3 py-2 outline-none focus:ring-2 ring-p2" style={{background:'var(--inputBg)',color:'var(--text)'}}/>
+                </div>
+            </div>
+            <Btn cls="w-full bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 py-3 text-lg"
+                onClick={()=>{dp({type:'TB_RESOLVE'});SFX.fanfare()}} disabled={!st.tb1||!st.tb2}>
+                🏆 Vyhodnotiť</Btn>
+            </>
+            ):(
+            <div className="text-center space-y-4 anim-pop">
+                <div className="text-5xl">🏆</div>
+                <h3 className="text-2xl font-black text-accent">Víťaz rozstrelu</h3>
+                <h2 className={`text-3xl font-black ${st.tbWinner===1?'text-p1':'text-p2'}`}>
+                    {st.tbWinner===1?'🔵':'🔴'} {tbWn}!
+                </h2>
+                <div className="flex justify-center gap-6 text-sm" style={{color:'var(--textSub)'}}>
+                    <span>🔵 {st.p1?.name}: {st.tb1}</span>
+                    <span>🔴 {st.p2?.name}: {st.tb2}</span>
+                </div>
+                {st.revealed&&<p style={{color:'var(--textSub)'}}>Správna odpoveď: <span className="text-accent font-bold">{st.curQ?.answer}</span></p>}
+                <Btn cls="bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 py-3 px-8 text-lg"
+                    onClick={()=>dp({type:'TB_TO_RESULTS'})}>
+                    🏁 Celkové výsledky</Btn>
+            </div>
+            )}
+        </Card>
+    );
+
+    /* Round switcher */
+    const roundSwitcher=(
+        <div className="mt-3">
+            <button onClick={()=>setShowRoundSwitcher(!showRoundSwitcher)}
+                className="text-xs flex items-center gap-1 hover:text-accent transition-colors"
+                style={{color:'var(--textSub)'}}>
+                {showRoundSwitcher?'▾':'▸'} Prepnúť kolo manuálne
+            </button>
+            {showRoundSwitcher&&(
+                <div className="mt-2 p-3 rounded-xl border flex flex-wrap gap-2" style={{background:'var(--card)',borderColor:'var(--border)'}}>
+                    <Btn cls={`text-sm py-2 px-4 ${st.round===1?'bg-accent text-black font-bold':'hover:opacity-80'}`}
+                        style={st.round!==1?{background:'var(--card2)'}:{}} onClick={()=>jumpTo(1)}>
+                        ⚡ 1. Rýchla runda</Btn>
+                    <Btn cls={`text-sm py-2 px-4 ${st.round===2?'bg-accent text-black font-bold':'hover:opacity-80'}`}
+                        style={st.round!==2?{background:'var(--card2)'}:{}} onClick={()=>jumpTo(2)}>
+                        🎯 2. Hlavná runda</Btn>
+                    <Btn cls={`text-sm py-2 px-4 ${st.round===3?'bg-accent text-black font-bold':'hover:opacity-80'}`}
+                        style={st.round!==3?{background:'var(--card2)'}:{}} onClick={()=>jumpTo(3)}>
+                        🏁 3. Finálová runda</Btn>
+                    <Btn cls={`text-sm py-2 px-4 ${st.round==='tiebreaker'?'bg-accent text-black font-bold':'hover:opacity-80'}`}
+                        style={st.round!=='tiebreaker'?{background:'var(--card2)'}:{}} onClick={()=>jumpTo('tiebreaker')}>
+                        ⚔️ Rozstrel</Btn>
+                </div>
+            )}
+        </div>
+    );
+
+    gameView=(
+        <div className="min-h-screen flex flex-col">
+            {header}
+            <div className="flex-1 p-4 max-w-4xl mx-auto w-full overflow-y-auto">
+                <div className="grid grid-cols-2 gap-4">
+                    {playerCard(1,st.p1?.name,st.s1,st.active===1)}
+                    {playerCard(2,st.p2?.name,st.s2,st.active===2)}
+                </div>
+                {roundSwitcher}
+                {r1Info}
+                {catPicker}
+                {ptsPicker}
+                {questionArea}
+                {timerDisplay}
+                {tbUI}
+                {st.curQ&&nextBtn}
             </div>
         </div>
-        <Btn cls="w-full bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 py-3 text-lg"
-            onClick={()=>{dp({type:'TB_RESOLVE'});SFX.fanfare()}} disabled={!st.tb1||!st.tb2}>
-            🏆 Vyhodnotiť</Btn>
-        {st.revealed&&<p className="text-center" style={{color:'var(--textSub)'}}>Správna odpoveď: <span className="text-accent font-bold">{st.curQ.answer}</span></p>}
-    </Card>
-);
+    );
+}
 
-/* ── LAYOUT ── */
-const dashboard=(
-    <div className="flex-1 p-4 max-w-4xl mx-auto w-full overflow-y-auto">
-        <div className="grid grid-cols-2 gap-4">
-            {playerCard(1,st.p1?.name,st.s1,st.active===1)}
-            {playerCard(2,st.p2?.name,st.s2,st.active===2)}
-        </div>
-        {r1Info}
-        {catPicker}
-        {ptsPicker}
-        {questionArea}
-        {timerDisplay}
-        {tbUI}
-        {st.curQ&&nextBtn}
-    </div>
-);
-
+/* ═══ FINAL RENDER – single return point ═══ */
 if(st.testMode){
+    const isCentered=r1StuckDetected||st.showRoundSummary;
     return(
         <div className="h-screen flex flex-col">
             <div className="bg-purple-900/50 border-b border-purple-500/30 px-4 py-1 flex items-center justify-between">
@@ -1157,22 +1411,29 @@ if(st.testMode){
                     onClick={()=>dp({type:'SET_TEST',v:false})}>📺 Produkcia</Btn>
             </div>
             <div className="flex-1 flex overflow-hidden">
-                <div className="w-1/2 flex flex-col overflow-y-auto border-r" style={{background:'var(--bg)',borderColor:'var(--border)'}}>
-                    {header}
-                    {dashboard}
+                <div className={`w-1/2 ${isCentered?'flex items-center justify-center':'flex flex-col'} overflow-y-auto border-r`} style={{background:'var(--bg)',borderColor:'var(--border)'}}>
+                    {gameView}
                 </div>
-                <div className="w-1/2"><EmbeddedTV/></div>
+                <div className="w-1/2 relative overflow-hidden">
+                    <EmbeddedTV/>
+                    {st.feedback&&(
+                        <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center pointer-events-none ${st.feedback==='correct'?'bg-green-500/85':'bg-red-500/85'}`}
+                            style={{animation:'scale-pop .4s ease-out'}}>
+                            <span className="text-[80px]">{st.feedback==='correct'?'✓':'✗'}</span>
+                            <h1 className="text-3xl font-black text-white">{st.feedback==='correct'?'SPRÁVNE!':'NESPRÁVNE!'}</h1>
+                            {st.curQ&&<p className="text-xl text-white/90 font-bold mt-2">{st.curQ.answer}</p>}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
 }
 
-return(
-    <div className="min-h-screen flex flex-col">
-        {header}
-        {dashboard}
-    </div>
-);
+if(r1StuckDetected||st.showRoundSummary){
+    return <div className="min-h-screen flex items-center justify-center">{gameView}</div>;
+}
+return gameView;
 }
 
 /* ════════════ RESULTS ════════════ */
@@ -1312,11 +1573,11 @@ return(
                 <button onClick={()=>dp({type:'DEL_HIST',id:h.id})} className="text-red-400/50 hover:text-red-400 text-xs">✕</button>
             </div>
             <div className="flex items-center gap-3">
-                <span className={`font-bold ${h.winner===h.p1.name?'text-accent':''}`}>{h.p1.name}</span>
+                <span className={`font-bold ${h.winner===h.p1?.name?'text-accent':''}`}>{h.p1?.name}</span>
                 <span className="text-p1 font-black text-lg">{h.s1}</span>
                 <span style={{color:'var(--border)'}}>:</span>
                 <span className="text-p2 font-black text-lg">{h.s2}</span>
-                <span className={`font-bold ${h.winner===h.p2.name?'text-accent':''}`}>{h.p2.name}</span>
+                <span className={`font-bold ${h.winner===h.p2?.name?'text-accent':''}`}>{h.p2?.name}</span>
                 <span className="ml-auto text-accent">🏆 {h.winner}</span>
             </div>
         </div>

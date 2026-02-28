@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>DUEL – TV Obrazovka</title>
+<title>Vedomostný QUIZ 2026 – TV</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
@@ -37,6 +37,8 @@ body{font-family:'Inter',system-ui,sans-serif;overflow:hidden;cursor:none}
 .junior-bg{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460)}
 .standard-bg{background:linear-gradient(180deg,#0a0a1a,#0f172a,#0a0a1a)}
 .cat-card{animation:category-pop .4s ease-out both}
+@keyframes feedback-in{0%{opacity:0;transform:scale(.5)}30%{opacity:1;transform:scale(1.05)}100%{opacity:1;transform:scale(1)}}
+.feedback-overlay{animation:feedback-in .4s ease-out}
 </style>
 <script>
 tailwind.config={theme:{extend:{colors:{
@@ -81,6 +83,7 @@ matematika:'from-blue-500/20 to-blue-600/5 border-blue-500/50',
 historicke_podujatia:'from-orange-500/20 to-orange-600/5 border-orange-500/50',
 };
 const R1_TIME=90;
+const R3_Q_PER_CAT=2;
 
 /* ─── Helpers ─── */
 function goFullscreen(){
@@ -113,9 +116,9 @@ function WaitingScreen(){
 return(
 <div className="w-full h-full flex flex-col items-center justify-center standard-bg">
     <div className="anim-float">
-        <h1 className="text-9xl font-black text-accent mb-4" style={{textShadow:'0 0 80px rgba(234,179,8,.4)'}}>DUEL</h1>
+        <h1 className="text-6xl font-black text-accent mb-4" style={{textShadow:'0 0 80px rgba(234,179,8,.4)'}}>Vedomostný QUIZ 2026</h1>
     </div>
-    <p className="text-slate-500 text-xl">Vedomostná súťaž</p>
+    <p className="text-slate-500 text-xl">Rodinná vedomostná súťaž</p>
     <p className="text-slate-600 text-sm mt-4">Čaká sa na spustenie hry…</p>
 </div>
 );
@@ -176,7 +179,7 @@ return(
     {/* Header bar */}
     <div className="flex items-center justify-between px-6 py-3 bg-black/30">
         <div className="flex items-center gap-3">
-            <span className="text-accent font-black text-xl anim-glow">DUEL</span>
+            <span className="text-accent font-black text-xl anim-glow">QUIZ 2026</span>
             <span className="text-slate-600">│</span>
             <span className="text-white font-semibold text-lg">{ROUND_NAMES[d.round]}</span>
         </div>
@@ -202,16 +205,21 @@ return(
     <div className="flex-1 flex items-center justify-center px-8 pb-6">
         {cats.length===0?<p className="text-accent text-3xl font-black py-8">Všetky okruhy boli použité!</p>:
         <div className="grid grid-cols-2 gap-4 max-w-3xl w-full">
-            {cats.map((c,i)=>(
+            {cats.map((c,i)=>{
+                const cqc=d.catQCounts||{};
+                const remaining=d.round===3?R3_Q_PER_CAT-(cqc[c]||0):null;
+                return(
                 <div key={c}
                     className={`cat-card p-6 rounded-2xl border-2 bg-gradient-to-br ${CAT_COLORS[c]||'from-slate-500/20 to-slate-600/5 border-slate-500/50'}`}
                     style={{animationDelay:i*0.05+'s'}}>
                     <div className="flex items-center gap-4">
                         <span className="text-5xl">{CAT_ICONS[c]||'❓'}</span>
                         <span className="font-bold text-2xl">{CAT_LABELS[c]||c}</span>
+                        {remaining!==null&&<span className="ml-auto text-lg font-bold text-accent bg-black/40 rounded-full px-3 py-1">{remaining}/{R3_Q_PER_CAT}</span>}
                     </div>
                 </div>
-            ))}
+                );
+            })}
         </div>}
     </div>
 
@@ -233,6 +241,33 @@ return(
 /* ═══════════════ TIEBREAKER SCREEN ═══════════════ */
 function TiebreakerScreen({d}){
 const isJunior=d.diff==='junior';
+
+/* If tbWinner is set, show the tiebreaker winner screen */
+if(d.tbWinner){
+    const winName=d.tbWinner===1?d.p1?.name:d.p2?.name;
+    const winColor=d.tbWinner===1?'text-blue-400':'text-red-400';
+    return(
+    <div className={`w-full h-full flex flex-col items-center justify-center ${isJunior?'junior-bg':'standard-bg'}`}>
+        <div className="anim-pop text-center">
+            <div className="text-8xl mb-4">⚡</div>
+            <h2 className="text-3xl text-slate-400 font-semibold mb-2">Víťaz rozstrelu</h2>
+            <h1 className={`text-6xl font-black ${winColor} mb-6`}>{winName}!</h1>
+            <div className="flex items-center justify-center gap-12 mt-4">
+                <div className="text-center">
+                    <div className="text-lg text-blue-400 font-bold mb-2">🔵 {d.p1?.name}</div>
+                    <div className="text-3xl font-black text-blue-300">{d.s1}</div>
+                </div>
+                <div className="text-4xl font-bold text-slate-700">:</div>
+                <div className="text-center">
+                    <div className="text-lg text-red-400 font-bold mb-2">🔴 {d.p2?.name}</div>
+                    <div className="text-3xl font-black text-red-300">{d.s2}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    );
+}
+
 return(
 <div className={`w-full h-full flex flex-col items-center justify-center ${isJunior?'junior-bg':'standard-bg'}`}>
     <div className="anim-pop text-center max-w-2xl px-6">
@@ -241,8 +276,8 @@ return(
         <p className="text-slate-400 mb-6 text-lg">Jedna otázka – najbližšia odpoveď vyhráva!</p>
         {d.tbQ&&(
             <div className="anim-slide">
-                <div className="bg-black/50 border-2 border-accent/30 rounded-3xl p-8 mb-6">
-                    <p className="text-3xl font-bold leading-relaxed">{d.tbQ.question}</p>
+                <div className="bg-black/50 border-2 border-accent/30 rounded-3xl p-10 mb-6">
+                    <p className="text-5xl font-bold leading-relaxed">{d.tbQ.question}</p>
                 </div>
                 {d.tbQ.answer&&(
                     <div className="anim-pop">
@@ -394,7 +429,7 @@ return(
     {/* Top bar */}
     <div className="flex items-center justify-between px-6 py-3 bg-black/30">
         <div className="flex items-center gap-3">
-            <span className="text-accent font-black text-xl anim-glow">DUEL</span>
+            <span className="text-accent font-black text-xl anim-glow">QUIZ 2026</span>
             <span className="text-slate-600">│</span>
             <span className="text-white font-semibold text-lg">{d.roundName||ROUND_NAMES[d.round]}</span>
         </div>
@@ -418,7 +453,7 @@ return(
         <PlayerCard num={1} name={d.p1?.name} score={d.s1} isActive={d.active===1} flash={flashP1}/>
 
         {/* Center */}
-        <div className="flex-1 flex flex-col items-center justify-center max-w-xl gap-4">
+        <div className="flex-1 flex flex-col items-center justify-center max-w-4xl gap-5">
             {/* R1: 90s timer circle */}
             {isR1&&d.r1tRun&&(
                 <div className="relative flex items-center justify-center">
@@ -446,7 +481,7 @@ return(
             )}
 
             {/* R1 info */}
-            {isR1&&<div className="text-center text-slate-400 text-xl">{d.r1phase===1?d.p1?.name:d.p2?.name} odpovedá · <span className="text-accent font-bold">10</span> bodov</div>}
+            {isR1&&<div className="text-center text-slate-400 text-2xl">{d.r1phase===1?d.p1?.name:d.p2?.name} odpovedá · <span className="text-accent font-bold">10</span> bodov</div>}
 
             {/* Passing indicator */}
             {d.passing&&(
@@ -458,28 +493,28 @@ return(
             {/* Points badge (R2/R3) */}
             {!isR1&&d.q&&(
                 <div className="flex items-center gap-2">
-                    <span className="text-accent font-black text-4xl">{d.pts}</span>
-                    <span className="text-slate-400 text-lg">bodov</span>
+                    <span className="text-accent font-black text-5xl">{d.pts}</span>
+                    <span className="text-slate-400 text-xl">bodov</span>
                 </div>
             )}
 
             {/* Question */}
             {d.q?(
                 <div className="anim-slide text-center w-full">
-                    <span className={`text-sm font-semibold uppercase tracking-widest mb-2 block ${isJunior?'text-purple-400':'text-accent/70'}`}>
+                    <span className={`text-2xl font-semibold uppercase tracking-widest mb-3 block ${isJunior?'text-purple-400':'text-accent/70'}`}>
                         {d.q.category}
                     </span>
-                    <div className={`bg-black/50 border-2 ${isJunior?'border-purple-500/30':'border-accent/20'} rounded-2xl p-6`}>
-                        <p className="font-bold text-2xl leading-relaxed">{d.q.question}</p>
+                    <div className={`bg-black/50 border-2 ${isJunior?'border-purple-500/30':'border-accent/20'} rounded-3xl p-10`}>
+                        <p className="font-bold text-5xl leading-relaxed">{d.q.question}</p>
                     </div>
                 </div>
-            ):<div className="text-slate-600 text-lg">Čakám na otázku…</div>}
+            ):<div className="text-slate-600 text-2xl">Čakám na otázku…</div>}
 
             {/* Answer reveal */}
             {d.answer&&(
                 <div className="anim-pop">
-                    <div className="bg-green-500/10 border-2 border-green-500/30 rounded-2xl px-6 py-3">
-                        <span className="text-green-400 font-bold text-2xl">✓ {d.answer}</span>
+                    <div className="bg-green-500/10 border-2 border-green-500/30 rounded-3xl px-8 py-5">
+                        <span className="text-green-400 font-bold text-4xl">✓ {d.answer}</span>
                     </div>
                 </div>
             )}
@@ -491,8 +526,21 @@ return(
 
     {/* Bottom bar */}
     <div className="flex items-center justify-center px-6 py-2 bg-black/20">
-        <span className="text-slate-600 text-sm">DUEL v3.2</span>
+        <span className="text-slate-600 text-sm">Vedomostný QUIZ 2026</span>
     </div>
+</div>
+);
+}
+
+/* ═══════════════ FEEDBACK OVERLAY ═══════════════ */
+function FeedbackOverlay({type,answer}){
+if(!type)return null;
+const ok=type==='correct';
+return(
+<div className={`fixed inset-0 z-50 flex flex-col items-center justify-center pointer-events-none feedback-overlay ${ok?'bg-green-500/90':'bg-red-500/90'}`}>
+    <span className="text-[200px] leading-none text-white">{ok?'✓':'✗'}</span>
+    <h1 className="text-7xl font-black text-white mt-4">{ok?'SPRÁVNE!':'NESPRÁVNE!'}</h1>
+    {answer&&<p className="text-5xl text-white/90 font-bold mt-4">{answer}</p>}
 </div>
 );
 }
@@ -512,28 +560,25 @@ useEffect(()=>{
     return()=>ch.close();
 },[]);
 
-/* Click to fullscreen */
 const handleClick=()=>goFullscreen();
 
-if(waiting||!data)return <div onClick={handleClick}><WaitingScreen/></div>;
+let content;
+if(waiting||!data) content=<WaitingScreen/>;
+else{
+    const d=data;
+    if(d.showRoundSummary) content=<RoundSummaryScreen d={d}/>;
+    else if(d.over) content=<ResultsScreen d={d}/>;
+    else if(d.round==='tiebreaker'&&(d.tbQ||d.tbWinner)) content=<TiebreakerScreen d={d}/>;
+    else if((d.round===2||d.round===3)&&!d.selCat&&d.categories) content=<CategoryGridScreen d={d}/>;
+    else content=<GameScreen d={d}/>;
+}
 
-const d=data;
-
-/* Round summary */
-if(d.showRoundSummary)return <div onClick={handleClick}><RoundSummaryScreen d={d}/></div>;
-
-/* Final results */
-if(d.over)return <div onClick={handleClick}><ResultsScreen d={d}/></div>;
-
-/* Tiebreaker */
-if(d.round==='tiebreaker'&&d.tbQ)return <div onClick={handleClick}><TiebreakerScreen d={d}/></div>;
-
-/* Category grid (R2/R3 before category picked) */
-if((d.round===2||d.round===3)&&!d.selCat&&d.categories)
-    return <div onClick={handleClick}><CategoryGridScreen d={d}/></div>;
-
-/* Active game with question */
-return <div onClick={handleClick}><GameScreen d={d}/></div>;
+return(
+<div onClick={handleClick} className="w-full h-full">
+    {content}
+    {data&&data.feedback&&<FeedbackOverlay type={data.feedback} answer={data.answer}/>}
+</div>
+);
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<TVApp/>);

@@ -5,9 +5,9 @@
 # ─────────────────────────────────────
 cd "$(dirname "$0")"
 
-PORT=8080
-# If port 8080 is taken, try 8081-8089
-for p in 8080 8081 8082 8083 8084 8085; do
+PORT=9004
+# If port 9004 is taken, try 9005-9009
+for p in 9004 9005 9006 9007 9008 9009; do
     if ! lsof -i :$p > /dev/null 2>&1; then
         PORT=$p
         break

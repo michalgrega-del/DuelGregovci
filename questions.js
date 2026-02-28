@@ -11992,5 +11992,175 @@ const QUESTIONS_DB = [
     "category": "dejiny",
     "difficulty": "level2",
     "type": "tiebreaker"
-  }
+  },
+
+  /* ═══════ JUNIOR EASY – jednoslovné odpovede pre deti do 10 rokov ═══════ */
+
+  /* ── DEJINY (R2) ── */
+  {"id":1500,"question":"Aké zviera bolo symbolom starého Egypta – mačka alebo pes?","answer":"Mačka","category":"dejiny","difficulty":"junior","type":"standard"},
+  {"id":1501,"question":"Akú farbu mal plášť Supermana?","answer":"Červenú","category":"dejiny","difficulty":"junior","type":"standard"},
+  {"id":1502,"question":"Ako sa volá hlavné mesto Slovenska?","answer":"Bratislava","category":"dejiny","difficulty":"junior","type":"standard"},
+  {"id":1503,"question":"Koľko má týždeň dní?","answer":"7","category":"dejiny","difficulty":"junior","type":"standard"},
+  {"id":1504,"question":"Na akom kontinente žijú tučniaky?","answer":"Antarktída","category":"dejiny","difficulty":"junior","type":"standard"},
+  {"id":1505,"question":"Ako sa volá najdlhšia rieka na svete?","answer":"Níl","category":"dejiny","difficulty":"junior","type":"standard"},
+  {"id":1506,"question":"V ktorej krajine stojí Eiffelova veža?","answer":"Francúzsko","category":"dejiny","difficulty":"junior","type":"standard"},
+  {"id":1507,"question":"Ako sa volal prvý slovenský prezident?","answer":"Kováč","category":"dejiny","difficulty":"junior","type":"standard"},
+  {"id":1508,"question":"Aké je hlavné mesto Česka?","answer":"Praha","category":"dejiny","difficulty":"junior","type":"standard"},
+  {"id":1509,"question":"V akej krajine sa nachádza Big Ben?","answer":"Anglicko","category":"dejiny","difficulty":"junior","type":"standard"},
+
+  /* ── VEDA (R2) ── */
+  {"id":1510,"question":"Aký plyn dýchame?","answer":"Kyslík","category":"veda","difficulty":"junior","type":"standard"},
+  {"id":1511,"question":"Koľko planét má slnečná sústava?","answer":"8","category":"veda","difficulty":"junior","type":"standard"},
+  {"id":1512,"question":"Je Slnko hviezda alebo planéta?","answer":"Hviezda","category":"veda","difficulty":"junior","type":"standard"},
+  {"id":1513,"question":"V akom skupenstve je ľad?","answer":"Pevnom","category":"veda","difficulty":"junior","type":"standard"},
+  {"id":1514,"question":"Akou farbou má byť semafor keď sa ide?","answer":"Zelenou","category":"veda","difficulty":"junior","type":"standard"},
+  {"id":1515,"question":"Čo ťahá veci dole k zemi?","answer":"Gravitácia","category":"veda","difficulty":"junior","type":"standard"},
+  {"id":1516,"question":"Aká planéta je najbližšie k Slnku?","answer":"Merkúr","category":"veda","difficulty":"junior","type":"standard"},
+  {"id":1517,"question":"Z čoho je vyrobené sklo?","answer":"Piesok","category":"veda","difficulty":"junior","type":"standard"},
+  {"id":1518,"question":"Koľko nôh má pavúk?","answer":"8","category":"veda","difficulty":"junior","type":"standard"},
+  {"id":1519,"question":"Ako sa volá naša galaxia?","answer":"Mliečna cesta","category":"veda","difficulty":"junior","type":"standard"},
+
+  /* ── ŠPORT (R2) ── */
+  {"id":1520,"question":"Koľko hráčov má futbalový tím na ihrisku?","answer":"11","category":"sport","difficulty":"junior","type":"standard"},
+  {"id":1521,"question":"Akou časťou tela sa hrá futbal?","answer":"Nohou","category":"sport","difficulty":"junior","type":"standard"},
+  {"id":1522,"question":"Akej farby je tenisová loptička?","answer":"Žltá","category":"sport","difficulty":"junior","type":"standard"},
+  {"id":1523,"question":"V akom športe sa používa puk?","answer":"Hokej","category":"sport","difficulty":"junior","type":"standard"},
+  {"id":1524,"question":"Koľko košov je na basketbalovom ihrisku?","answer":"2","category":"sport","difficulty":"junior","type":"standard"},
+  {"id":1525,"question":"Ako sa volá najrýchlejší šprint na olympiáde?","answer":"Stovka","category":"sport","difficulty":"junior","type":"standard"},
+  {"id":1526,"question":"V akom športe sa skáče do vody?","answer":"Skoky","category":"sport","difficulty":"junior","type":"standard"},
+  {"id":1527,"question":"Akú farbu má olympijský kruh uprostred?","answer":"Čiernu","category":"sport","difficulty":"junior","type":"standard"},
+  {"id":1528,"question":"Ako sa volá cieľ v hokeji?","answer":"Bránka","category":"sport","difficulty":"junior","type":"standard"},
+  {"id":1529,"question":"V akom športe sa používa raketa a košík?","answer":"Badminton","category":"sport","difficulty":"junior","type":"standard"},
+
+  /* ── KULTÚRA (R2) ── */
+  {"id":1530,"question":"Koľko farieb má dúha?","answer":"7","category":"kultura","difficulty":"junior","type":"standard"},
+  {"id":1531,"question":"Aký hudobný nástroj má čierne a biele klávesy?","answer":"Klavír","category":"kultura","difficulty":"junior","type":"standard"},
+  {"id":1532,"question":"Ako sa volá slovenský hrad na skale nad Dunajom?","answer":"Devín","category":"kultura","difficulty":"junior","type":"standard"},
+  {"id":1533,"question":"Čo kreslíme štetcom?","answer":"Obraz","category":"kultura","difficulty":"junior","type":"standard"},
+  {"id":1534,"question":"Aký deň je Štedrý večer?","answer":"24. december","category":"kultura","difficulty":"junior","type":"standard"},
+  {"id":1535,"question":"Ako sa volá rozprávková postava s dlhým nosom?","answer":"Pinocchio","category":"kultura","difficulty":"junior","type":"standard"},
+  {"id":1536,"question":"Aké zvieratko nosí Mikuláš v rozprávke?","answer":"Čerta","category":"kultura","difficulty":"junior","type":"standard"},
+  {"id":1537,"question":"V akej farbe maľoval Van Gogh slnečnice?","answer":"Žltej","category":"kultura","difficulty":"junior","type":"standard"},
+  {"id":1538,"question":"Ako sa volá slovenská hymna?","answer":"Nad Tatrou sa blýska","category":"kultura","difficulty":"junior","type":"standard"},
+  {"id":1539,"question":"Aký tvar má stopka?","answer":"Kruh","category":"kultura","difficulty":"junior","type":"standard"},
+
+  /* ── LITERATÚRA (R2) ── */
+  {"id":1540,"question":"Kto napísal rozprávku o Červenej čiapočke?","answer":"Grimm","category":"literatura","difficulty":"junior","type":"standard"},
+  {"id":1541,"question":"Ako sa volá chlapec čarodejník z kníh J.K. Rowlingovej?","answer":"Harry Potter","category":"literatura","difficulty":"junior","type":"standard"},
+  {"id":1542,"question":"Aké zviera je Winnie v rozprávke?","answer":"Medvedík","category":"literatura","difficulty":"junior","type":"standard"},
+  {"id":1543,"question":"Koľko trpaslíkov bolo v rozprávke o Snehulienke?","answer":"7","category":"literatura","difficulty":"junior","type":"standard"},
+  {"id":1544,"question":"Ako sa volá dievčatko s modrými vlasmi v rozprávke?","answer":"Malvína","category":"literatura","difficulty":"junior","type":"standard"},
+  {"id":1545,"question":"Kto bol Robinsonov spoločník na ostrove?","answer":"Piatok","category":"literatura","difficulty":"junior","type":"standard"},
+  {"id":1546,"question":"Ako sa volá kocúr v čižmách?","answer":"Kocúr","category":"literatura","difficulty":"junior","type":"standard"},
+  {"id":1547,"question":"Čo stratila Popoluška na bále?","answer":"Črievičku","category":"literatura","difficulty":"junior","type":"standard"},
+  {"id":1548,"question":"Aké zviera je Bambi?","answer":"Srnček","category":"literatura","difficulty":"junior","type":"standard"},
+  {"id":1549,"question":"Kam šla Alica v rozprávke?","answer":"Do Krajiny zázrakov","category":"literatura","difficulty":"junior","type":"standard"},
+
+  /* ── OSOBNOSTI (R2) ── */
+  {"id":1550,"question":"Kto namaľoval Monu Lízu?","answer":"Leonardo","category":"osobnosti","difficulty":"junior","type":"standard"},
+  {"id":1551,"question":"Ako sa volá najznámejší vedec s vyplazením jazyka na fotke?","answer":"Einstein","category":"osobnosti","difficulty":"junior","type":"standard"},
+  {"id":1552,"question":"Kto vynašiel žiarovku?","answer":"Edison","category":"osobnosti","difficulty":"junior","type":"standard"},
+  {"id":1553,"question":"Ako sa volal prvý človek vo vesmíre?","answer":"Gagarin","category":"osobnosti","difficulty":"junior","type":"standard"},
+  {"id":1554,"question":"Kto je Mickey Mouse – myš alebo kačka?","answer":"Myš","category":"osobnosti","difficulty":"junior","type":"standard"},
+  {"id":1555,"question":"Ako sa volá princ zo Shreka?","answer":"Fiona","category":"osobnosti","difficulty":"junior","type":"standard"},
+  {"id":1556,"question":"Kto je Spider-Man v civilnom živote?","answer":"Peter Parker","category":"osobnosti","difficulty":"junior","type":"standard"},
+  {"id":1557,"question":"Ako sa volá hlavná postava z Frozen?","answer":"Elsa","category":"osobnosti","difficulty":"junior","type":"standard"},
+  {"id":1558,"question":"Kto napísal hudbu k filmu Lví kráľ?","answer":"Elton John","category":"osobnosti","difficulty":"junior","type":"standard"},
+  {"id":1559,"question":"Ako sa volá futbalista s prezývkou CR7?","answer":"Ronaldo","category":"osobnosti","difficulty":"junior","type":"standard"},
+
+  /* ── PRÍRODA (R2) ── */
+  {"id":1560,"question":"Aké zviera je kráľ džungle?","answer":"Lev","category":"priroda","difficulty":"junior","type":"standard"},
+  {"id":1561,"question":"Akú farbu majú listy na jar?","answer":"Zelenú","category":"priroda","difficulty":"junior","type":"standard"},
+  {"id":1562,"question":"Čo produkujú včely?","answer":"Med","category":"priroda","difficulty":"junior","type":"standard"},
+  {"id":1563,"question":"Aké zviera dáva mlieko?","answer":"Krava","category":"priroda","difficulty":"junior","type":"standard"},
+  {"id":1564,"question":"Koľko nôh má motýľ?","answer":"6","category":"priroda","difficulty":"junior","type":"standard"},
+  {"id":1565,"question":"Aký je najväčší cicavec na svete?","answer":"Veľryba","category":"priroda","difficulty":"junior","type":"standard"},
+  {"id":1566,"question":"Čím dýchajú ryby?","answer":"Žiabrami","category":"priroda","difficulty":"junior","type":"standard"},
+  {"id":1567,"question":"Aké zviera nosí svoj dom na chrbte?","answer":"Slimák","category":"priroda","difficulty":"junior","type":"standard"},
+  {"id":1568,"question":"Aká je najvyššia hora na svete?","answer":"Everest","category":"priroda","difficulty":"junior","type":"standard"},
+  {"id":1569,"question":"Aký strom dáva žalude?","answer":"Dub","category":"priroda","difficulty":"junior","type":"standard"},
+
+  /* ── STROJE & TECHNIKA (R3) ── */
+  {"id":1570,"question":"Koľko kolies má bicykel?","answer":"2","category":"stroje","difficulty":"junior","type":"standard"},
+  {"id":1571,"question":"Čím sa ovláda počítač – myšou alebo vidličkou?","answer":"Myšou","category":"stroje","difficulty":"junior","type":"standard"},
+  {"id":1572,"question":"Aký stroj lieta vo vzduchu?","answer":"Lietadlo","category":"stroje","difficulty":"junior","type":"standard"},
+  {"id":1573,"question":"Čo používame na telefonovanie?","answer":"Telefón","category":"stroje","difficulty":"junior","type":"standard"},
+  {"id":1574,"question":"Aký stroj perie oblečenie?","answer":"Práčka","category":"stroje","difficulty":"junior","type":"standard"},
+  {"id":1575,"question":"Koľko kolies má auto?","answer":"4","category":"stroje","difficulty":"junior","type":"standard"},
+  {"id":1576,"question":"Čo svieti v dome keď je tma?","answer":"Žiarovka","category":"stroje","difficulty":"junior","type":"standard"},
+  {"id":1577,"question":"Aký stroj chladí jedlo?","answer":"Chladnička","category":"stroje","difficulty":"junior","type":"standard"},
+  {"id":1578,"question":"Čím sa strihajú vlasy?","answer":"Nožnicami","category":"stroje","difficulty":"junior","type":"standard"},
+  {"id":1579,"question":"Aký dopravný prostriedok jazdí po koľajniciach?","answer":"Vlak","category":"stroje","difficulty":"junior","type":"standard"},
+
+  /* ── DOPLŇOVAČKY (R3) ── */
+  {"id":1580,"question":"Dopĺň: Červená ___ (rozprávka)","answer":"Čiapočka","category":"doplnovacky","difficulty":"junior","type":"standard"},
+  {"id":1581,"question":"Dopĺň: Sne_ulienka","answer":"Snehulienka","category":"doplnovacky","difficulty":"junior","type":"standard"},
+  {"id":1582,"question":"Dopĺň: H-A-D má ___ písmená","answer":"3","category":"doplnovacky","difficulty":"junior","type":"standard"},
+  {"id":1583,"question":"Dopĺň: Šípková ___","answer":"Ruženka","category":"doplnovacky","difficulty":"junior","type":"standard"},
+  {"id":1584,"question":"Dopĺň: Malý ___ (rozprávka o chlapcovi čo nechcel rásť)","answer":"Princ","category":"doplnovacky","difficulty":"junior","type":"standard"},
+  {"id":1585,"question":"Dopĺň: Tri ___  (rozprávka s prasiatkami)","answer":"Prasiatka","category":"doplnovacky","difficulty":"junior","type":"standard"},
+  {"id":1586,"question":"Dopĺň: Zlatá ___  (ryba z rozprávky)","answer":"Rybka","category":"doplnovacky","difficulty":"junior","type":"standard"},
+  {"id":1587,"question":"Dopĺň: Ja_od_a (ovocie)","answer":"Jahoda","category":"doplnovacky","difficulty":"junior","type":"standard"},
+  {"id":1588,"question":"Dopĺň: Sl_nk_ (čo svieti na oblohe)","answer":"Slnko","category":"doplnovacky","difficulty":"junior","type":"standard"},
+  {"id":1589,"question":"Dopĺň: Ko_ka (zviera)","answer":"Kočka","category":"doplnovacky","difficulty":"junior","type":"standard"},
+
+  /* ── PRESMYČKY (R3) ── */
+  {"id":1590,"question":"Použi písmená P-E-S a vytvor slovo","answer":"Pes","category":"presmycky","difficulty":"junior","type":"standard"},
+  {"id":1591,"question":"Použi písmená K-O-L-O a vytvor slovo","answer":"Kolo","category":"presmycky","difficulty":"junior","type":"standard"},
+  {"id":1592,"question":"Použi písmená A-M-A-M a vytvor slovo","answer":"Mama","category":"presmycky","difficulty":"junior","type":"standard"},
+  {"id":1593,"question":"Použi písmená L-E-S a vytvor slovo","answer":"Les","category":"presmycky","difficulty":"junior","type":"standard"},
+  {"id":1594,"question":"Použi písmená M-O-D a vytvor slovo","answer":"Dom","category":"presmycky","difficulty":"junior","type":"standard"},
+  {"id":1595,"question":"Použi písmená Á-K-Č-A-K a vytvor slovo (zviera)","answer":"Kačka","category":"presmycky","difficulty":"junior","type":"standard"},
+  {"id":1596,"question":"Použi písmená R-O-K-A a vytvor slovo","answer":"Kora","category":"presmycky","difficulty":"junior","type":"standard"},
+  {"id":1597,"question":"Použi písmená O-K-S a vytvor slovo","answer":"Sok","category":"presmycky","difficulty":"junior","type":"standard"},
+  {"id":1598,"question":"Použi písmená B-A-L a vytvor slovo","answer":"Bal","category":"presmycky","difficulty":"junior","type":"standard"},
+  {"id":1599,"question":"Použi písmená O-H-N-Ě-Z a vytvor slovo","answer":"Oheň","category":"presmycky","difficulty":"junior","type":"standard"},
+
+  /* ── HUDBA (R3) ── */
+  {"id":1600,"question":"Koľko strún má gitara?","answer":"6","category":"hudba","difficulty":"junior","type":"standard"},
+  {"id":1601,"question":"Aký nástroj bubnuje?","answer":"Bubon","category":"hudba","difficulty":"junior","type":"standard"},
+  {"id":1602,"question":"Akým nástrojom hrá husličkár?","answer":"Husle","category":"hudba","difficulty":"junior","type":"standard"},
+  {"id":1603,"question":"Čím sa fúka do trúbky?","answer":"Vzduchom","category":"hudba","difficulty":"junior","type":"standard"},
+  {"id":1604,"question":"Aká nota je medzi Do a Mi?","answer":"Re","category":"hudba","difficulty":"junior","type":"standard"},
+  {"id":1605,"question":"Kto spieva pieseň Let It Go?","answer":"Elsa","category":"hudba","difficulty":"junior","type":"standard"},
+  {"id":1606,"question":"Koľko čiernych klávesov je v jednej oktáve na klavíri?","answer":"5","category":"hudba","difficulty":"junior","type":"standard"},
+  {"id":1607,"question":"Akým nástrojom hrá bubeník?","answer":"Bicie","category":"hudba","difficulty":"junior","type":"standard"},
+  {"id":1608,"question":"Ako sa volá skupina ľudí čo spievajú spolu?","answer":"Zbor","category":"hudba","difficulty":"junior","type":"standard"},
+  {"id":1609,"question":"Čo robí dirigent – spieva alebo mává paličkou?","answer":"Mává paličkou","category":"hudba","difficulty":"junior","type":"standard"},
+
+  /* ── FILM (R3) ── */
+  {"id":1610,"question":"Akej farby je Shrek?","answer":"Zelenej","category":"film","difficulty":"junior","type":"standard"},
+  {"id":1611,"question":"Ako sa volá snehuliak z Frozen?","answer":"Olaf","category":"film","difficulty":"junior","type":"standard"},
+  {"id":1612,"question":"Aké zviera je Simba?","answer":"Lev","category":"film","difficulty":"junior","type":"standard"},
+  {"id":1613,"question":"Ako sa volá klaun-ryba z filmu Hľadá sa Nemo?","answer":"Nemo","category":"film","difficulty":"junior","type":"standard"},
+  {"id":1614,"question":"Čo je Lightning McQueen – auto alebo vlak?","answer":"Auto","category":"film","difficulty":"junior","type":"standard"},
+  {"id":1615,"question":"Ako sa volá robot z filmu Wall-E?","answer":"Wall-E","category":"film","difficulty":"junior","type":"standard"},
+  {"id":1616,"question":"Koľko dalmatíncov je v známom filme?","answer":"101","category":"film","difficulty":"junior","type":"standard"},
+  {"id":1617,"question":"Aké zviera je Dumbo?","answer":"Slon","category":"film","difficulty":"junior","type":"standard"},
+  {"id":1618,"question":"Ako sa volá kovboj z Toy Story?","answer":"Woody","category":"film","difficulty":"junior","type":"standard"},
+  {"id":1619,"question":"Aká princezná má veľmi dlhé vlasy?","answer":"Rapunzel","category":"film","difficulty":"junior","type":"standard"},
+
+  /* ── MATEMATIKA (R3) ── */
+  {"id":1620,"question":"Koľko je 5 + 5?","answer":"10","category":"matematika","difficulty":"junior","type":"standard"},
+  {"id":1621,"question":"Koľko je 3 × 3?","answer":"9","category":"matematika","difficulty":"junior","type":"standard"},
+  {"id":1622,"question":"Koľko je 100 - 1?","answer":"99","category":"matematika","difficulty":"junior","type":"standard"},
+  {"id":1623,"question":"Koľko strán má trojuholník?","answer":"3","category":"matematika","difficulty":"junior","type":"standard"},
+  {"id":1624,"question":"Koľko je 2 × 10?","answer":"20","category":"matematika","difficulty":"junior","type":"standard"},
+  {"id":1625,"question":"Koľko minút má hodina?","answer":"60","category":"matematika","difficulty":"junior","type":"standard"},
+  {"id":1626,"question":"Koľko je 7 + 8?","answer":"15","category":"matematika","difficulty":"junior","type":"standard"},
+  {"id":1627,"question":"Koľko dní má rok?","answer":"365","category":"matematika","difficulty":"junior","type":"standard"},
+  {"id":1628,"question":"Aký tvar má futbalové ihrisko?","answer":"Obdĺžnik","category":"matematika","difficulty":"junior","type":"standard"},
+  {"id":1629,"question":"Koľko je 12 ÷ 2?","answer":"6","category":"matematika","difficulty":"junior","type":"standard"},
+
+  /* ── HISTORICKÉ UDALOSTI (R3) ── */
+  {"id":1630,"question":"Aké zviera poslali prvé do vesmíru – psa alebo mačku?","answer":"Psa","category":"historicke_podujatia","difficulty":"junior","type":"standard"},
+  {"id":1631,"question":"Kto letel prvý v lietadle?","answer":"Bratia Wrightovci","category":"historicke_podujatia","difficulty":"junior","type":"standard"},
+  {"id":1632,"question":"Na akom kontinente vznikli olympijské hry?","answer":"Európa","category":"historicke_podujatia","difficulty":"junior","type":"standard"},
+  {"id":1633,"question":"Čo sa oslavuje 1. januára?","answer":"Nový rok","category":"historicke_podujatia","difficulty":"junior","type":"standard"},
+  {"id":1634,"question":"Ako sa volá slávny potopený parník?","answer":"Titanic","category":"historicke_podujatia","difficulty":"junior","type":"standard"},
+  {"id":1635,"question":"V ktorej krajine stojí pyramída?","answer":"Egypt","category":"historicke_podujatia","difficulty":"junior","type":"standard"},
+  {"id":1636,"question":"Kto chodil po Mesiaci – ľudia alebo roboty?","answer":"Ľudia","category":"historicke_podujatia","difficulty":"junior","type":"standard"},
+  {"id":1637,"question":"Čo objavil Kolumbus – Ameriku alebo Austráliu?","answer":"Ameriku","category":"historicke_podujatia","difficulty":"junior","type":"standard"},
+  {"id":1638,"question":"Akým dopravným prostriedkom sa cestovalo pred autami?","answer":"Koňom","category":"historicke_podujatia","difficulty":"junior","type":"standard"},
+  {"id":1639,"question":"Ako sa volá najslávnejší slovenský hrad?","answer":"Bratislavský","category":"historicke_podujatia","difficulty":"junior","type":"standard"}
 ];
