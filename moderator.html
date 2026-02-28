@@ -372,11 +372,11 @@ useEffect(()=>{
 
 /* R1 auto-advance: when answered, auto-go to next question after 400ms */
 useEffect(()=>{
-    if(st.round===1&&st.answered&&st.r1tRun&&!st.showRoundSummary){
+    if(st.round===1&&st.answered&&!st.showRoundSummary){
         autoAdvRef.current=setTimeout(()=>dp({type:'NEXT_Q'}),400);
         return()=>clearTimeout(autoAdvRef.current);
     }
-},[st.answered,st.round,st.r1tRun,st.showRoundSummary]);
+},[st.answered,st.round,st.showRoundSummary]);
 
 /* R2/R3 Timer */
 useEffect(()=>{
@@ -1036,10 +1036,10 @@ const timerDisplay=(isR2||isR3)&&!isTB&&st.curQ&&(st.tRun||st.tSec<R2_TIMER||st.
     </div>
 );
 
-/* ── Next button (R2/R3) ── */
-const nextBtn=!isTB&&!isR1&&(
+/* ── Next button (all rounds) ── */
+const nextBtn=!isTB&&(
     <div className="mt-3 flex gap-2">
-        <Btn cls="bg-slate-600/30 hover:bg-slate-600/50 text-sm py-2" style={{color:'var(--textSub)'}} onClick={()=>dp({type:'SKIP'})} disabled={st.answered}>⊘ Bez bodov</Btn>
+        {!isR1&&<Btn cls="bg-slate-600/30 hover:bg-slate-600/50 text-sm py-2" style={{color:'var(--textSub)'}} onClick={()=>dp({type:'SKIP'})} disabled={st.answered}>⊘ Bez bodov</Btn>}
         <Btn cls="bg-accent/20 text-accent hover:bg-accent/30 text-sm py-2 flex-1" onClick={()=>dp({type:'NEXT_Q'})} disabled={!st.answered}>
             Ďalšia otázka →</Btn>
     </div>
