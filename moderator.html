@@ -344,6 +344,11 @@ if(a.s.theme!==undefined)applyTheme(a.s.theme);
 return{...st,settings:s}}
 case 'DEL_HIST':{const h=st.history.filter(x=>x.id!==a.id);S.s('history',h);return{...st,history:h}}
 case 'CLR_HIST':{S.s('history',[]);return{...st,history:[]}}
+
+/* Force end R1 – fallback when auto-advance fails */
+case 'FORCE_R1_END':
+return{...st,showRoundSummary:true,summaryRound:1,r1tRun:false,curQ:null,answered:false,revealed:false};
+
 default:return st;
 }
 }
@@ -354,7 +359,6 @@ function Provider({children}){
 const[st,dp]=useReducer(reducer,init);
 const r1Ref=useRef(null);
 const timerRef=useRef(null);
-const autoAdvRef=useRef(null);
 
 /* R1 90-second timer */
 useEffect(()=>{
@@ -369,14 +373,6 @@ useEffect(()=>{
     if(!st.r1tRun||st.round!==1)return;
     if(st.r1timer>5)SFX.tick();else if(st.r1timer>0)SFX.tickLow();else if(st.r1timer===0)SFX.buzzer();
 },[st.r1timer,st.r1tRun,st.round]);
-
-/* R1 auto-advance: when answered, auto-go to next question after 400ms */
-useEffect(()=>{
-    if(st.round===1&&st.answered&&!st.showRoundSummary){
-        autoAdvRef.current=setTimeout(()=>dp({type:'NEXT_Q'}),400);
-        return()=>clearTimeout(autoAdvRef.current);
-    }
-},[st.answered,st.round,st.showRoundSummary]);
 
 /* R2/R3 Timer */
 useEffect(()=>{
@@ -813,17 +809,70 @@ const qDisplay=isR1?st.r1qCount+1:st.qNum+1;
 const allCats=useMemo(()=>getCats(st.diff),[st.diff]);
 const availCats=allCats.filter(c=>!st.usedCats.includes(c));
 
-/* R1 action handlers – auto-advance */
-const r1Correct=()=>{SFX.correct();dp({type:'CORRECT'})};
-const r1Wrong=()=>{SFX.wrong();dp({type:'WRONG'})};
-const r1Skip=()=>{dp({type:'SKIP'})};
+/* R1 action handlers – SYNCHRONOUS: dispatch CORRECT/WRONG/SKIP then NEXT_Q immediately.
+   React 18 batches both into one render. No setTimeout = no race conditions. */
+const r1Correct=()=>{SFX.correct();dp({type:'CORRECT'});dp({type:'NEXT_Q'})};
+const r1Wrong=()=>{SFX.wrong();dp({type:'WRONG'});dp({type:'NEXT_Q'})};
+const r1Skip=()=>{dp({type:'SKIP'});dp({type:'NEXT_Q'})};
 
 /* R2/R3 action handlers */
 const r2Correct=()=>{SFX.correct();dp({type:'CORRECT'})};
 const r2Wrong=()=>{SFX.wrong();dp({type:'WRONG'})};
 const r2Super=()=>{dp({type:'PASS_SUPER'})};
 
+/* Force end R1 – fallback button */
+const forceEndR1=()=>dp({type:'FORCE_R1_END'});
 
+/* ── STUCK DETECTION: if R1 should be over but summary isn't showing ── */
+const r1StuckDetected=isR1&&!st.showRoundSummary&&!st.r1tRun&&(
+    (st.r1phase===2&&(st.r1timer<=0||st.r1qCount>=R1_MAX_Q-1&&st.answered))||
+    (!st.curQ&&!st.answered)
+);
+if(r1StuckDetected){
+    /* Auto-recover: show round summary directly */
+    const rs=st.stats;
+    const rd=rs.r1;
+    const content=(
+        <div className="flex flex-col items-center justify-center min-h-[60vh] p-6">
+            <div className="anim-pop text-center">
+                <h2 className="text-2xl font-bold mb-1" style={{color:'var(--textSub)'}}>Koniec 1. kola</h2>
+                <h3 className="text-3xl font-black text-accent mb-6">{ROUND_NAMES[1]}</h3>
+                <div className="flex items-center justify-center gap-12 mb-6">
+                    <div className="text-center">
+                        <div className="text-sm text-p1 font-semibold mb-1">🔵 {st.p1?.name}</div>
+                        <div className="text-6xl font-black text-p1">{st.s1}</div>
+                        <div className="text-xs mt-2"><span className="text-green-400 font-bold">{rd.p1c}✓</span> <span className="text-red-400 font-bold">{rd.p1w}✗</span></div>
+                    </div>
+                    <div className="text-4xl font-bold" style={{color:'var(--border)'}}>:</div>
+                    <div className="text-center">
+                        <div className="text-sm text-p2 font-semibold mb-1">🔴 {st.p2?.name}</div>
+                        <div className="text-6xl font-black text-p2">{st.s2}</div>
+                        <div className="text-xs mt-2"><span className="text-green-400 font-bold">{rd.p2c}✓</span> <span className="text-red-400 font-bold">{rd.p2w}✗</span></div>
+                    </div>
+                </div>
+                {st.s1>st.s2&&<p className="text-p1 font-bold text-lg mb-4">🔵 {st.p1?.name} vedie!</p>}
+                {st.s2>st.s1&&<p className="text-p2 font-bold text-lg mb-4">🔴 {st.p2?.name} vedie!</p>}
+                {st.s1===st.s2&&<p className="text-accent font-bold text-lg mb-4">⚖️ Remíza!</p>}
+                <Btn cls="bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 text-lg py-3 px-8 shadow-lg shadow-yellow-500/20"
+                    onClick={()=>{dp({type:'FORCE_R1_END'});dp({type:'NEXT_ROUND'})}}>
+                    ▶ Pokračovať do 2. kola
+                </Btn>
+            </div>
+        </div>
+    );
+    if(st.testMode)return(
+        <div className="h-screen flex flex-col">
+            <div className="bg-purple-900/50 border-b border-purple-500/30 px-4 py-1 flex items-center justify-between">
+                <span className="text-purple-300 font-bold text-sm">🧪 TESTOVACÍ REŽIM</span>
+            </div>
+            <div className="flex-1 flex overflow-hidden">
+                <div className="w-1/2 flex items-center justify-center overflow-y-auto" style={{background:'var(--bg)'}}>{content}</div>
+                <div className="w-1/2"><EmbeddedTV/></div>
+            </div>
+        </div>
+    );
+    return <div className="min-h-screen flex items-center justify-center">{content}</div>;
+}
 
 /* ── ROUND SUMMARY VIEW ── */
 if(st.showRoundSummary){
@@ -949,6 +998,12 @@ const r1Info=isR1&&(
                 <div className="h-full rounded-full timeline-bar" style={{width:((st.r1timer/R1_TIME)*100)+'%',background:st.r1timer<=10?'#ef4444':st.r1timer<=20?'#eab308':'#22c55e'}}/>
             </div>
         )}
+        {/* Fallback: manual End-R1 button – always visible during R1 */}
+        <div className="mt-2 flex justify-end">
+            <Btn cls="bg-red-600/20 text-red-400 hover:bg-red-600/40 text-xs py-1 px-3" onClick={forceEndR1}>
+                ⏹ Ukončiť kolo
+            </Btn>
+        </div>
     </div>
 );
 
