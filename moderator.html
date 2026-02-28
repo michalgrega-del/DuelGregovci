@@ -252,6 +252,7 @@ case 'T_STOP':return{...st,tRun:false};
 
 /* ── NEXT QUESTION ── */
 case 'NEXT_Q':{
+if(st.showRoundSummary) return st;
 /* === Round 1 === */
 if(st.round===1){
     const nc=st.r1qCount+1;
@@ -371,11 +372,11 @@ useEffect(()=>{
 
 /* R1 auto-advance: when answered, auto-go to next question after 400ms */
 useEffect(()=>{
-    if(st.round===1&&st.answered&&st.r1tRun){
+    if(st.round===1&&st.answered&&st.r1tRun&&!st.showRoundSummary){
         autoAdvRef.current=setTimeout(()=>dp({type:'NEXT_Q'}),400);
         return()=>clearTimeout(autoAdvRef.current);
     }
-},[st.answered,st.round,st.r1tRun]);
+},[st.answered,st.round,st.r1tRun,st.showRoundSummary]);
 
 /* R2/R3 Timer */
 useEffect(()=>{
@@ -399,7 +400,7 @@ useEffect(()=>{
     }
     const allCats=getCats(st.diff);
     const availCats=allCats.filter(c=>!st.usedCats.includes(c));
-    const showQOnTV=st.round===1||st.tRun||st.answered||st.passing||st.tSec<R2_TIMER;
+    const showQOnTV=(st.round===1&&st.r1tRun)||st.tRun||st.answered||st.passing||st.tSec<R2_TIMER;
     const r3picker=st.round===3?(st.active===1?2:1):st.active;
     const payload={
         screen:st.screen,p1:st.p1,p2:st.p2,s1:st.s1,s2:st.s2,
@@ -610,7 +611,7 @@ const embIsR3=st.round===3;
 const embPicker=embIsR3?(st.active===1?2:1):st.active;
 const embPickerName=embPicker===1?st.p1?.name:st.p2?.name;
 const embAnswererName=st.active===1?st.p1?.name:st.p2?.name;
-const embShowQ=st.round===1||st.tRun||st.answered||st.passing||st.tSec<R2_TIMER;
+const embShowQ=(st.round===1&&st.r1tRun)||st.tRun||st.answered||st.passing||st.tSec<R2_TIMER;
 
 if(!st.gameOn&&st.screen!=='results'&&!st.showRoundSummary)return(
     <div className={`h-full flex flex-col items-center justify-center ${isJunior?'junior-bg':'standard-bg'}`}>
@@ -821,6 +822,8 @@ const r1Skip=()=>{dp({type:'SKIP'})};
 const r2Correct=()=>{SFX.correct();dp({type:'CORRECT'})};
 const r2Wrong=()=>{SFX.wrong();dp({type:'WRONG'})};
 const r2Super=()=>{dp({type:'PASS_SUPER'})};
+
+
 
 /* ── ROUND SUMMARY VIEW ── */
 if(st.showRoundSummary){
@@ -1290,7 +1293,7 @@ return(
         </div>
         <div className="rounded-xl p-3 border" style={{background:'var(--card2)',borderColor:'var(--border)'}}>
             <p className="font-semibold mb-1">Kolo 1 – Rýchla runda</p>
-            <p className="text-xs" style={{color:'var(--textSub)'}}>90 sekúnd na hráča · neobmedzený počet otázok · 10 bodov · bez odpočtu</p>
+            <p className="text-xs" style={{color:'var(--textSub)'}}>90 sekúnd na hráča · max 10 otázok na hráča · 10 bodov · bez odpočtu</p>
         </div>
         <div className="rounded-xl p-3 border" style={{background:'var(--card2)',borderColor:'var(--border)'}}>
             <p className="font-semibold mb-1">Kolo 2 & 3 – Časovač</p>
