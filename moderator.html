@@ -48,6 +48,11 @@ accent:'#eab308',p1:'#3b82f6',p2:'#ef4444',ok:'#22c55e',err:'#ef4444',
 </head>
 <body style="background:var(--bg);color:var(--text)" class="min-h-screen">
 <div id="root"></div>
+<script>
+/* Safety: ensure QUESTIONS_DB is on window for Babel standalone access */
+if(typeof QUESTIONS_DB!=='undefined'&&!window.QUESTIONS_DB)window.QUESTIONS_DB=QUESTIONS_DB;
+if(!window.QUESTIONS_DB||!window.QUESTIONS_DB.length)console.error('[QUIZ] QUESTIONS_DB not loaded!',typeof QUESTIONS_DB);
+</script>
 <script type="text/babel">
 // ================================================================
 //  Vedomostný QUIZ 2026 – Moderátor

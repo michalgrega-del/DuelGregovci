@@ -3,7 +3,7 @@
    Scope: sk = Slovensko, svet = Svet
    Difficulty: junior (1. stupeň ZŠ), level1 (SŠ), level2 (ťažšie)
    ══════════════════════════════════════════════════════════════════ */
-const QUESTIONS_DB = [
+var QUESTIONS_DB = [
 {id:1001,question:'Kto bol prvý prezident Slovenskej republiky?',answer:'Michal Kováč',category:'dejiny_sk',difficulty:'junior',scope:'sk',type:'normal'},
 {id:1002,question:'V ktorom roku vznikla samostatná Slovenská republika?',answer:'1993',category:'dejiny_sk',difficulty:'junior',scope:'sk',type:'normal'},
 {id:1003,question:'Ako sa volal hrad, kde sa konali korunovácie uhorských kráľov?',answer:'Bratislavský hrad',category:'dejiny_sk',difficulty:'junior',scope:'sk',type:'normal'},
