@@ -58,32 +58,79 @@ const{useState,useReducer,useContext,createContext,useEffect,useRef,useCallback,
 const ROUND_NAMES={1:'Rýchla runda',2:'Hlavná runda',3:'Finálová runda',tiebreaker:'Rozstrel'};
 const DIFF_LABELS={junior:'Junior (7–12)',level1:'Level 1 (13–18)',level2:'Level 2 (18–99)'};
 const CAT_LABELS={
-dejiny:'Dejiny',veda:'Veda',sport:'Šport',kultura:'Kultúra',literatura:'Literatúra',
-osobnosti:'Osobnosti',priroda:'Príroda',stroje:'Stroje & Technika',
-doplnovacky:'Doplňovačky',presmycky:'Presmyčky',hudba:'Hudba',film:'Film',
-matematika:'Matematika',historicke_podujatia:'Historické udalosti'
+/* SK */
+dejiny_sk:'Dejiny',geografia_sk:'Geografia',krajske_mesta:'Krajské mestá',prirodoveda_sk:'Prírodoveda',
+matematika_sk:'Matematika',spz_sk:'Slovenské ŠPZ',literatura_sk:'Literatúra',slovensky_jazyk:'Slovenský jazyk',
+osobnosti_sk:'Osobnosti',pohoria_sk:'Pohoria',informatika_sk:'Informatika',spisovatelia_sk:'Spisovatelia',
+sport_sk:'Šport',prislovia_sk:'Príslovia',zvierata_sk:'Zvieratá',hrady_zamky:'Hrady a zámky',
+rieky_sk:'Rieky Slovenska',vlajky_erby_sk:'Erby a vlajky',pravopis_sk:'Pravopis',
+veda_technika_sk:'Veda a technika',nabozenstvo_sk:'Náboženstvo',divadlo_sk:'Divadlo a film',
+pocasie_sk:'Počasie a príroda',skauting_sk:'Skauting',zaujimavosti_sk:'Zaujímavosti',
+/* SVET */
+dejiny_svet:'Dejiny sveta',geografia_svet:'Geografia',hlavne_mesta:'Hlavné mestá',sport_svet:'Šport',
+opera_svet:'Opera a hudba',divadlo_svet:'Divadlo',vlajky_svet:'Vlajky štátov',umenie_svet:'Umenie',
+veda_technika_svet:'Veda a technika',literatura_svet:'Literatúra',hudba_svet:'Hudba',film_svet:'Film',
+matematika_svet:'Matematika',osobnosti_svet:'Osobnosti',priroda_svet:'Príroda',
+informatika_svet:'Informatika',astronomia:'Vesmír',zaujimavosti_svet:'Zaujímavosti',
+olympijske_hry:'Olympijské hry',kulinarka:'Kuchyne sveta',
 };
 const CAT_ICONS={
-dejiny:'📜',veda:'🔬',sport:'⚽',kultura:'🎭',literatura:'📚',
-osobnosti:'👤',priroda:'🌿',stroje:'⚙️',doplnovacky:'✍️',
-presmycky:'🔤',hudba:'🎵',film:'🎬',matematika:'🔢',
-historicke_podujatia:'🏛️'
+dejiny_sk:'📜',geografia_sk:'🗺️',krajske_mesta:'🏙️',prirodoveda_sk:'🌱',matematika_sk:'🔢',
+spz_sk:'🚗',literatura_sk:'📚',slovensky_jazyk:'🗣️',osobnosti_sk:'👤',pohoria_sk:'⛰️',
+informatika_sk:'💻',spisovatelia_sk:'✒️',sport_sk:'⚽',prislovia_sk:'💬',zvierata_sk:'🦊',
+hrady_zamky:'🏰',rieky_sk:'🌊',vlajky_erby_sk:'🏛️',pravopis_sk:'✍️',veda_technika_sk:'🔬',
+nabozenstvo_sk:'⛪',divadlo_sk:'🎭',pocasie_sk:'🌤️',skauting_sk:'⚜️',zaujimavosti_sk:'💡',
+dejiny_svet:'📜',geografia_svet:'🌍',hlavne_mesta:'🏛️',sport_svet:'🏆',opera_svet:'🎶',
+divadlo_svet:'🎭',vlajky_svet:'🏳️',umenie_svet:'🎨',veda_technika_svet:'🔬',literatura_svet:'📖',
+hudba_svet:'🎵',film_svet:'🎬',matematika_svet:'🔢',osobnosti_svet:'👤',priroda_svet:'🌿',
+informatika_svet:'💻',astronomia:'🚀',zaujimavosti_svet:'💡',olympijske_hry:'🏅',kulinarka:'🍽️',
 };
 const CAT_COLORS={
-dejiny:'from-amber-500/20 to-amber-600/5 border-amber-500/50',
-veda:'from-cyan-500/20 to-cyan-600/5 border-cyan-500/50',
-sport:'from-green-500/20 to-green-600/5 border-green-500/50',
-kultura:'from-purple-500/20 to-purple-600/5 border-purple-500/50',
-literatura:'from-rose-500/20 to-rose-600/5 border-rose-500/50',
-osobnosti:'from-indigo-500/20 to-indigo-600/5 border-indigo-500/50',
-priroda:'from-emerald-500/20 to-emerald-600/5 border-emerald-500/50',
-stroje:'from-slate-500/20 to-slate-600/5 border-slate-500/50',
-doplnovacky:'from-yellow-500/20 to-yellow-600/5 border-yellow-500/50',
-presmycky:'from-pink-500/20 to-pink-600/5 border-pink-500/50',
-hudba:'from-violet-500/20 to-violet-600/5 border-violet-500/50',
-film:'from-red-500/20 to-red-600/5 border-red-500/50',
-matematika:'from-blue-500/20 to-blue-600/5 border-blue-500/50',
-historicke_podujatia:'from-orange-500/20 to-orange-600/5 border-orange-500/50',
+dejiny_sk:'from-amber-500/20 to-amber-600/5 border-amber-500/50',
+geografia_sk:'from-emerald-500/20 to-emerald-600/5 border-emerald-500/50',
+krajske_mesta:'from-indigo-500/20 to-indigo-600/5 border-indigo-500/50',
+prirodoveda_sk:'from-lime-500/20 to-lime-600/5 border-lime-500/50',
+matematika_sk:'from-blue-500/20 to-blue-600/5 border-blue-500/50',
+spz_sk:'from-slate-500/20 to-slate-600/5 border-slate-500/50',
+literatura_sk:'from-rose-500/20 to-rose-600/5 border-rose-500/50',
+slovensky_jazyk:'from-fuchsia-500/20 to-fuchsia-600/5 border-fuchsia-500/50',
+osobnosti_sk:'from-cyan-500/20 to-cyan-600/5 border-cyan-500/50',
+pohoria_sk:'from-teal-500/20 to-teal-600/5 border-teal-500/50',
+informatika_sk:'from-violet-500/20 to-violet-600/5 border-violet-500/50',
+spisovatelia_sk:'from-pink-500/20 to-pink-600/5 border-pink-500/50',
+sport_sk:'from-green-500/20 to-green-600/5 border-green-500/50',
+prislovia_sk:'from-yellow-500/20 to-yellow-600/5 border-yellow-500/50',
+zvierata_sk:'from-orange-500/20 to-orange-600/5 border-orange-500/50',
+hrady_zamky:'from-stone-500/20 to-stone-600/5 border-stone-500/50',
+rieky_sk:'from-sky-500/20 to-sky-600/5 border-sky-500/50',
+vlajky_erby_sk:'from-red-500/20 to-red-600/5 border-red-500/50',
+pravopis_sk:'from-purple-500/20 to-purple-600/5 border-purple-500/50',
+veda_technika_sk:'from-cyan-500/20 to-cyan-600/5 border-cyan-500/50',
+nabozenstvo_sk:'from-amber-500/20 to-amber-600/5 border-amber-500/50',
+divadlo_sk:'from-purple-500/20 to-purple-600/5 border-purple-500/50',
+pocasie_sk:'from-sky-500/20 to-sky-600/5 border-sky-500/50',
+skauting_sk:'from-emerald-500/20 to-emerald-600/5 border-emerald-500/50',
+zaujimavosti_sk:'from-yellow-500/20 to-yellow-600/5 border-yellow-500/50',
+dejiny_svet:'from-amber-500/20 to-amber-600/5 border-amber-500/50',
+geografia_svet:'from-emerald-500/20 to-emerald-600/5 border-emerald-500/50',
+hlavne_mesta:'from-indigo-500/20 to-indigo-600/5 border-indigo-500/50',
+sport_svet:'from-green-500/20 to-green-600/5 border-green-500/50',
+opera_svet:'from-rose-500/20 to-rose-600/5 border-rose-500/50',
+divadlo_svet:'from-purple-500/20 to-purple-600/5 border-purple-500/50',
+vlajky_svet:'from-red-500/20 to-red-600/5 border-red-500/50',
+umenie_svet:'from-fuchsia-500/20 to-fuchsia-600/5 border-fuchsia-500/50',
+veda_technika_svet:'from-cyan-500/20 to-cyan-600/5 border-cyan-500/50',
+literatura_svet:'from-pink-500/20 to-pink-600/5 border-pink-500/50',
+hudba_svet:'from-violet-500/20 to-violet-600/5 border-violet-500/50',
+film_svet:'from-red-500/20 to-red-600/5 border-red-500/50',
+matematika_svet:'from-blue-500/20 to-blue-600/5 border-blue-500/50',
+osobnosti_svet:'from-teal-500/20 to-teal-600/5 border-teal-500/50',
+priroda_svet:'from-lime-500/20 to-lime-600/5 border-lime-500/50',
+informatika_svet:'from-violet-500/20 to-violet-600/5 border-violet-500/50',
+astronomia:'from-slate-500/20 to-slate-600/5 border-slate-500/50',
+zaujimavosti_svet:'from-yellow-500/20 to-yellow-600/5 border-yellow-500/50',
+olympijske_hry:'from-orange-500/20 to-orange-600/5 border-orange-500/50',
+kulinarka:'from-stone-500/20 to-stone-600/5 border-stone-500/50',
 };
 const R2_PTS=[10,20,30,40,50];
 const R3_PTS=Array.from({length:36},(_,i)=>i*10);
@@ -93,11 +140,19 @@ const R2_TIMER=10;
 const R2_COUNT=10;
 const R3_COUNT=20;
 const R3_Q_PER_CAT=2; /* 2 otázky na kategóriu v 3. kole */
-const ALL_CATS=['dejiny','veda','sport','kultura','literatura','osobnosti','priroda',
-    'stroje','doplnovacky','presmycky','hudba','film','matematika','historicke_podujatia'];
-/* Náhodne vyber 10 kategórií pre kolo z dostupných */
-function pickRoundCats(diff,n=10){
-    const avail=ALL_CATS.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&q.type!=='tiebreaker'));
+const SK_CATS=['dejiny_sk','geografia_sk','krajske_mesta','prirodoveda_sk','matematika_sk',
+    'spz_sk','literatura_sk','slovensky_jazyk','osobnosti_sk','pohoria_sk',
+    'informatika_sk','spisovatelia_sk','sport_sk','prislovia_sk','zvierata_sk',
+    'hrady_zamky','rieky_sk','vlajky_erby_sk','pravopis_sk','veda_technika_sk',
+    'nabozenstvo_sk','divadlo_sk','pocasie_sk','skauting_sk','zaujimavosti_sk'];
+const SVET_CATS=['dejiny_svet','geografia_svet','hlavne_mesta','sport_svet','opera_svet',
+    'divadlo_svet','vlajky_svet','umenie_svet','veda_technika_svet','literatura_svet',
+    'hudba_svet','film_svet','matematika_svet','osobnosti_svet','priroda_svet',
+    'informatika_svet','astronomia','zaujimavosti_svet','olympijske_hry','kulinarka'];
+const SCOPE_CATS={sk:SK_CATS,svet:SVET_CATS};
+function pickRoundCats(diff,scope,n=10){
+    const base=SCOPE_CATS[scope]||SK_CATS;
+    const avail=base.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&q.scope===scope&&q.type!=='tiebreaker'));
     const shuffled=[...avail].sort(()=>Math.random()-.5);
     return shuffled.slice(0,n);
 }
@@ -151,18 +206,25 @@ return{
 
 /* ─── TTS (Text-to-Speech – slovenský hlas) ─── */
 const TTS=(()=>{
-let _on=false,_tmr=null,_vc=null,_audio=null;
+let _on=false,_tmr=null,_vc=null,_audio=null,_gender='male';
 const _pick=()=>{
     if(_vc)return _vc;
     const vs=speechSynthesis.getVoices();
     if(vs.length)console.log('[TTS] Dostupné hlasy:',vs.map(v=>`${v.name} (${v.lang})`).join(', '));
-    /* Priorita: 1) sk-SK mužský, 2) sk-SK akýkoľvek, 3) cs-CZ mužský, 4) cs-CZ akýkoľvek */
-    _vc=vs.find(v=>/^sk[-_]?SK/i.test(v.lang)&&/male|mu[zž]/i.test(v.name))
-        ||vs.find(v=>/^sk/i.test(v.lang))
-        ||vs.find(v=>/^cs/i.test(v.lang)&&/male|mu[zž]|zden[eě]k/i.test(v.name))
-        ||vs.find(v=>/^cs/i.test(v.lang))
-        ||null;
-    if(_vc)console.log('[TTS] Vybraný hlas:',_vc.name,_vc.lang);
+    if(_gender==='female'){
+        _vc=vs.find(v=>/^sk/i.test(v.lang)&&/female|žen|zen|woman|zuzana/i.test(v.name))
+            ||vs.find(v=>/^sk/i.test(v.lang))
+            ||vs.find(v=>/^cs/i.test(v.lang)&&/female|žen|zen|woman/i.test(v.name))
+            ||vs.find(v=>/^cs/i.test(v.lang))
+            ||null;
+    } else {
+        _vc=vs.find(v=>/^sk/i.test(v.lang)&&/male|mu[zž]/i.test(v.name)&&!/female/i.test(v.name))
+            ||vs.find(v=>/^sk/i.test(v.lang))
+            ||vs.find(v=>/^cs/i.test(v.lang)&&/male|mu[zž]|zden[eě]k/i.test(v.name)&&!/female/i.test(v.name))
+            ||vs.find(v=>/^cs/i.test(v.lang))
+            ||null;
+    }
+    if(_vc)console.log('[TTS] Vybraný hlas:',_vc.name,_vc.lang,'('+_gender+')');
     return _vc;
 };
 if(typeof speechSynthesis!=='undefined'){
@@ -186,7 +248,8 @@ const _stopCurrent=()=>{
     if(_audio){try{_audio.pause();_audio.currentTime=0}catch(e){}_audio=null}
 };
 const stop=_stopCurrent;
-return{get enabled(){return _on},set enabled(v){_on=!!v;if(!v)stop()},speak,after,stop,cancel:_cancelTimer};
+return{get enabled(){return _on},set enabled(v){_on=!!v;if(!v)stop()},speak,after,stop,cancel:_cancelTimer,
+    setGender(g){_gender=g||'male';_vc=null;_pick()}};
 })();
 
 /* ─── SHUFFLE QUESTIONS at load ─── */
@@ -203,14 +266,15 @@ const ids=new Set();
 hist.slice(-10).forEach(h=>{if(h.usedQIds)h.usedQIds.forEach(id=>ids.add(id))});
 return ids;
 }
-function pickQ(diff,usedIds,cat=null,type=null){
-let pool=QUESTIONS_DB.filter(q=>q.difficulty===diff&&!usedIds.has(q.id)&&(cat?q.category===cat:true)&&(type?q.type===type:q.type!=='tiebreaker'));
-if(!pool.length)pool=QUESTIONS_DB.filter(q=>q.difficulty===diff&&(cat?q.category===cat:true)&&(type?q.type===type:q.type!=='tiebreaker'));
+function pickQ(diff,usedIds,cat=null,type=null,scope='sk'){
+let pool=QUESTIONS_DB.filter(q=>q.difficulty===diff&&q.scope===scope&&!usedIds.has(q.id)&&(cat?q.category===cat:true)&&(type?q.type===type:q.type!=='tiebreaker'));
+if(!pool.length)pool=QUESTIONS_DB.filter(q=>q.difficulty===diff&&q.scope===scope&&(cat?q.category===cat:true)&&(type?q.type===type:q.type!=='tiebreaker'));
 return pool.length?pool[Math.floor(Math.random()*pool.length)]:null;
 }
-function getCats(diff,round,roundCats){
-if(roundCats&&roundCats.length)return roundCats.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&q.type!=='tiebreaker'));
-return ALL_CATS.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&q.type!=='tiebreaker'));
+function getCats(diff,round,roundCats,scope){
+if(roundCats&&roundCats.length)return roundCats.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&q.scope===scope&&q.type!=='tiebreaker'));
+const base=SCOPE_CATS[scope||'sk']||SK_CATS;
+return base.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&q.scope===scope&&q.type!=='tiebreaker'));
 }
 function applyTheme(t){
 if(t==='light')document.body.classList.add('light');
@@ -222,7 +286,7 @@ const init={
 screen:'home',players:S.g('players',[]),history:S.g('history',[]),
 settings:S.g('settings',{timer:15,sound:true,r2count:10,r3count:20,theme:'dark'}),
 testMode:false,
-gameDate:new Date().toISOString().slice(0,10),p1:null,p2:null,diff:'junior',
+gameDate:new Date().toISOString().slice(0,10),p1:null,p2:null,diff:'junior',scope:'sk',voiceGender:'male',
 round:1,qNum:0,curQ:null,usedIds:new Set(),
 s1:0,s2:0,active:1,tRun:false,tSec:15,
 pts:10,revealed:false,answered:false,
@@ -254,7 +318,7 @@ case 'SETUP':return{...st,...a.d};
 /* ── START GAME ── */
 case 'START_GAME':{
 const u=new Set(getRecentUsedIds());
-const q=pickQ('junior',u);if(q)u.add(q.id);
+const q=pickQ('junior',u,null,null,st.scope);if(q)u.add(q.id);
 return{...st,screen:'game',gameOn:true,over:false,
     round:1,qNum:0,curQ:q,usedIds:u,
     s1:0,s2:0,active:1,tRun:false,tSec:R2_TIMER,
@@ -268,7 +332,7 @@ return{...st,screen:'game',gameOn:true,over:false,
 /* ── START GAME at Round 2 ── */
 case 'START_GAME_R2':{
 const u=new Set(getRecentUsedIds());
-const rc2=pickRoundCats(st.diff||'junior',10);
+const rc2=pickRoundCats(st.diff||'junior',st.scope||'sk',10);
 return{...st,screen:'game',gameOn:true,over:false,
     round:2,qNum:0,curQ:null,usedIds:u,
     s1:0,s2:0,active:1,originalActive:1,tRun:false,tSec:R2_TIMER,
@@ -286,7 +350,7 @@ const n=st.r1timer-1;
 if(n<=0){
     /* Time's up for this player */
     if(st.r1phase===1){
-        const u2=new Set(st.usedIds),q=pickQ('junior',u2);if(q)u2.add(q.id);
+        const u2=new Set(st.usedIds),q=pickQ('junior',u2,null,null,st.scope);if(q)u2.add(q.id);
         return{...st,r1timer:R1_TIME,r1tRun:false,r1phase:2,r1qCount:0,active:2,curQ:q,usedIds:u2,answered:false,revealed:false,pts:10}
     }
     return{...st,r1timer:0,r1tRun:false,showRoundSummary:true,summaryRound:1,curQ:null,answered:false,revealed:false}
@@ -326,10 +390,16 @@ return{...st,s1:p===1?st.s1-pv:st.s1,s2:p===2?st.s2-pv:st.s2,answered:true,tRun:
 /* ── SKIP (R1 "Ďalej" / no points) ── */
 case 'SKIP':return{...st,answered:true,tRun:false,passing:false};
 
-/* ── PASS SUPER: opponent gets a chance ── */
+/* ── PASS SUPER: original player loses pts, opponent gets a chance ── */
 case 'PASS_SUPER':{
 const opp=st.active===1?2:1;
-return{...st,passing:true,originalActive:st.active,active:opp,tRun:true,tSec:R2_TIMER,revealed:false}
+const pv=st.pts;
+const rk=st.round===2?'r2':'r3';
+const wk=st.active===1?'p1w':'p2w';
+const ns={...st.stats,[rk]:{...st.stats[rk],[wk]:st.stats[rk][wk]+1}};
+return{...st,passing:true,originalActive:st.active,active:opp,
+    s1:st.active===1?st.s1-pv:st.s1,s2:st.active===2?st.s2-pv:st.s2,
+    tRun:true,tSec:R2_TIMER,revealed:false,stats:ns}
 }
 
 /* ── R2/R3 Timer ── */
@@ -346,12 +416,12 @@ if(st.round===1){
     if(st.r1timer<=0||nc>=R1_MAX_Q){
         /* Time ran out or question limit reached */
         if(st.r1phase===1){
-            const u2=new Set(st.usedIds),q=pickQ('junior',u2);if(q)u2.add(q.id);
+            const u2=new Set(st.usedIds),q=pickQ('junior',u2,null,null,st.scope);if(q)u2.add(q.id);
             return{...st,r1phase:2,r1qCount:0,r1timer:R1_TIME,r1tRun:false,active:2,curQ:q,usedIds:u2,answered:false,revealed:false,pts:10}
         }
         return{...st,showRoundSummary:true,summaryRound:1,r1tRun:false,curQ:null,answered:false,revealed:false}
     }
-    const u2=new Set(st.usedIds),q=pickQ('junior',u2);if(q)u2.add(q.id);
+    const u2=new Set(st.usedIds),q=pickQ('junior',u2,null,null,st.scope);if(q)u2.add(q.id);
     return{...st,r1qCount:nc,curQ:q,usedIds:u2,answered:false,revealed:false,pts:10}
 }
 /* === Round 2 === */
@@ -386,18 +456,18 @@ return st;
 /* ── NEXT ROUND (from summary) ── */
 case 'NEXT_ROUND':{
 if(st.summaryRound===1){
-    const rc2=pickRoundCats(st.diff,10);
+    const rc2=pickRoundCats(st.diff,st.scope,10);
     return{...st,round:2,qNum:0,curQ:null,active:1,originalActive:1,showRoundSummary:false,summaryRound:null,
         tRun:false,tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,usedCats:[],roundCats:rc2,catQCounts:{},passing:false}
 }
 if(st.summaryRound===2){
-    const rc3=pickRoundCats(st.diff,10);
+    const rc3=pickRoundCats(st.diff,st.scope,10);
     return{...st,round:3,qNum:0,curQ:null,active:2,originalActive:2,showRoundSummary:false,summaryRound:null,
         tRun:false,tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,usedCats:[],roundCats:rc3,catQCounts:{},passing:false}
 }
 if(st.summaryRound===3){
     if(st.s1===st.s2){
-        const u2=new Set(st.usedIds),q=pickQ(st.diff,u2,null,'tiebreaker');if(q)u2.add(q.id);
+        const u2=new Set(st.usedIds),q=pickQ(st.diff,u2,null,'tiebreaker',st.scope);if(q)u2.add(q.id);
         return{...st,round:'tiebreaker',qNum:0,curQ:q,usedIds:u2,active:1,
             showRoundSummary:false,summaryRound:null,
             tRun:false,tSec:R2_TIMER,pts:10,revealed:false,answered:false,selCat:null,tb1:'',tb2:'',passing:false}
@@ -410,7 +480,7 @@ return st;
 
 /* ── Category selection (R2/R3) ── */
 case 'SEL_CAT':{
-const u2=new Set(st.usedIds),q=pickQ(st.diff,u2,a.cat);if(q)u2.add(q.id);
+const u2=new Set(st.usedIds),q=pickQ(st.diff,u2,a.cat,null,st.scope);if(q)u2.add(q.id);
 /* R2: 1 otázka na kategóriu → hneď odstrániť. R3: 2 otázky → sledujeme cez catQCounts */
 const uc=st.round===2?[...st.usedCats,a.cat]:[...st.usedCats];
 return{...st,curQ:q,usedIds:u2,selCat:a.cat,usedCats:uc}}
@@ -454,20 +524,20 @@ const base={...st,screen:'game',gameOn:true,over:false,winner:null,tbWinner:null
     showRoundSummary:false,summaryRound:null,tRun:false,tSec:R2_TIMER,r1tRun:false,
     selCat:null,usedCats:[],catQCounts:{},pts:10,revealed:false,answered:false,passing:false};
 if(target===1){
-    const u2=new Set(st.usedIds),q=pickQ('junior',u2);if(q)u2.add(q.id);
+    const u2=new Set(st.usedIds),q=pickQ('junior',u2,null,null,st.scope);if(q)u2.add(q.id);
     return{...base,round:1,qNum:0,curQ:q,usedIds:u2,active:1,originalActive:1,
         r1phase:1,r1qCount:0,r1timer:R1_TIME,roundCats:[]}
 }
 if(target===2){
-    const rc2=pickRoundCats(st.diff,10);
+    const rc2=pickRoundCats(st.diff,st.scope,10);
     return{...base,round:2,qNum:0,curQ:null,active:1,originalActive:1,r1phase:2,r1qCount:0,r1timer:0,roundCats:rc2}
 }
 if(target===3){
-    const rc3=pickRoundCats(st.diff,10);
+    const rc3=pickRoundCats(st.diff,st.scope,10);
     return{...base,round:3,qNum:0,curQ:null,active:2,originalActive:2,r1phase:2,r1qCount:0,r1timer:0,roundCats:rc3}
 }
 if(target==='tiebreaker'){
-    const u2=new Set(st.usedIds),q=pickQ(st.diff,u2,null,'tiebreaker');if(q)u2.add(q.id);
+    const u2=new Set(st.usedIds),q=pickQ(st.diff,u2,null,'tiebreaker',st.scope);if(q)u2.add(q.id);
     return{...base,round:'tiebreaker',qNum:0,curQ:q,usedIds:u2,active:1,
         r1phase:2,r1qCount:0,r1timer:0,tb1:'',tb2:''}
 }
@@ -532,7 +602,7 @@ useEffect(()=>{
         sendTV('WAITING',{});return;
     }
     const r2c=R2_COUNT,r3c=R3_COUNT;
-    const allCats=getCats(st.diff,st.round,st.roundCats);
+    const allCats=getCats(st.diff,st.round,st.roundCats,st.scope);
     const availCats=allCats.filter(c=>!st.usedCats.includes(c));
     const showQOnTV=(st.round===1&&st.r1tRun)||st.tRun||st.answered||st.passing||st.tSec<R2_TIMER;
     const r3picker=st.round===3?(st.active===1?2:1):st.active;
@@ -555,6 +625,7 @@ useEffect(()=>{
         tb1:st.tb1,tb2:st.tb2,tbWinner:st.tbWinner,tbQ:st.round==='tiebreaker'&&st.curQ?{question:st.curQ.question,answer:st.revealed?st.curQ.answer:null}:null,
         theme:st.settings.theme||'dark',
         feedback:st.feedback,
+        scope:st.scope||'sk',
     };
     sendTV('UPDATE',payload);
 });
@@ -643,20 +714,24 @@ const[p1id,setP1]=useState(st.p1?.id||'');
 const[p2id,setP2]=useState(st.p2?.id||'');
 const[diff,setDiff]=useState(st.diff);
 const[date,setDate]=useState(st.gameDate);
+const[scope,setScope]=useState(st.scope||'sk');
+const[voiceGender,setVoiceGender]=useState(st.voiceGender||'male');
 const canStart=p1id&&p2id&&p1id!==p2id;
 const doStart=(test=false)=>{
     const pl1=st.players.find(p=>p.id===+p1id),pl2=st.players.find(p=>p.id===+p2id);
     if(!pl1||!pl2)return;
-    dp({type:'SETUP',d:{p1:{id:pl1.id,name:pl1.name},p2:{id:pl2.id,name:pl2.name},diff,gameDate:date}});
+    dp({type:'SETUP',d:{p1:{id:pl1.id,name:pl1.name},p2:{id:pl2.id,name:pl2.name},diff,gameDate:date,scope,voiceGender}});
     dp({type:'SET_TEST',v:test});
+    TTS.setGender(voiceGender);
     SFX.gameStart();
     dp({type:'START_GAME'});
 };
 const doStartR2=(test=false)=>{
     const pl1=st.players.find(p=>p.id===+p1id),pl2=st.players.find(p=>p.id===+p2id);
     if(!pl1||!pl2)return;
-    dp({type:'SETUP',d:{p1:{id:pl1.id,name:pl1.name},p2:{id:pl2.id,name:pl2.name},diff,gameDate:date}});
+    dp({type:'SETUP',d:{p1:{id:pl1.id,name:pl1.name},p2:{id:pl2.id,name:pl2.name},diff,gameDate:date,scope,voiceGender}});
     dp({type:'SET_TEST',v:test});
+    TTS.setGender(voiceGender);
     SFX.gameStart();
     dp({type:'START_GAME_R2'});
 };
@@ -693,6 +768,28 @@ return(
                 </div>
             </div>
             {p1id&&p2id&&p1id===p2id&&<p className="text-red-400 text-sm">Vyber rôznych hráčov!</p>}
+            <div>
+                <label className="block text-sm mb-2" style={{color:'var(--textSub)'}}>Rozsah otázok</label>
+                <div className="flex gap-2">
+                    <button onClick={()=>setScope('sk')}
+                        className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${scope==='sk'?'bg-accent text-black shadow-lg shadow-yellow-500/20':'hover:opacity-80'}`}
+                        style={scope!=='sk'?{background:'var(--card2)'}:{}}>🇸🇰 SLOVENSKO</button>
+                    <button onClick={()=>setScope('svet')}
+                        className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${scope==='svet'?'bg-accent text-black shadow-lg shadow-yellow-500/20':'hover:opacity-80'}`}
+                        style={scope!=='svet'?{background:'var(--card2)'}:{}}>🌍 SVET</button>
+                </div>
+            </div>
+            <div>
+                <label className="block text-sm mb-2" style={{color:'var(--textSub)'}}>Hlas moderátora (TTS)</label>
+                <div className="flex gap-2">
+                    <button onClick={()=>setVoiceGender('male')}
+                        className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${voiceGender==='male'?'bg-blue-600 text-white shadow-lg':'hover:opacity-80'}`}
+                        style={voiceGender!=='male'?{background:'var(--card2)'}:{}}>🧑 Mužský</button>
+                    <button onClick={()=>setVoiceGender('female')}
+                        className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${voiceGender==='female'?'bg-pink-600 text-white shadow-lg':'hover:opacity-80'}`}
+                        style={voiceGender!=='female'?{background:'var(--card2)'}:{}}>👩 Ženský</button>
+                </div>
+            </div>
             <div>
                 <label className="block text-sm mb-2" style={{color:'var(--textSub)'}}>Obtiažnosť (kolo 2 a 3)</label>
                 <div className="flex gap-2">
@@ -757,7 +854,7 @@ const isJunior=st.diff==='junior';
 const r2c=R2_COUNT,r3c=R3_COUNT;
 const qNum=st.round===1?st.r1qCount+1:st.qNum+1;
 const qTotal=st.round===1?R1_MAX_Q:st.round===2?r2c:r3c;
-const allCats=getCats(st.diff,st.round,st.roundCats);
+const allCats=getCats(st.diff,st.round,st.roundCats,st.scope);
 const availCats=allCats.filter(c=>!st.usedCats.includes(c));
 const embIsR3=st.round===3;
 const embPicker=embIsR3?(st.active===1?2:1):st.active;
@@ -986,7 +1083,7 @@ const[ptsConfirmed,setPtsConfirmed]=useState(false);
 const[showRoundSwitcher,setShowRoundSwitcher]=useState(false);
 const[ttsOn,setTtsOn]=useState(false);
 const stRef=useRef(st);stRef.current=st;
-const allCats=useMemo(()=>getCats(st.diff,st.round,st.roundCats),[st.diff,st.round,st.roundCats]);
+const allCats=useMemo(()=>getCats(st.diff,st.round,st.roundCats,st.scope),[st.diff,st.round,st.roundCats,st.scope]);
 useEffect(()=>{setPtsConfirmed(false)},[st.qNum,st.round,st.selCat]);
 useEffect(()=>{
     TTS.enabled=ttsOn;
@@ -1009,11 +1106,11 @@ const availCats=allCats.filter(c=>!st.usedCats.includes(c));
 /* ── Handlers ── */
 const r1Start=()=>{dp({type:'R1_START'});TTS.speak(st.curQ?.question)};
 const r1Correct=()=>{SFX.correct();dp({type:'CORRECT'});dp({type:'NEXT_Q'});
-    TTS.after(()=>{const s=stRef.current;return s.round===1&&s.r1tRun?s.curQ?.question:null},2000)};
+    TTS.after(()=>{const s=stRef.current;return s.round===1&&s.r1tRun?s.curQ?.question:null},1000)};
 const r1Wrong=()=>{SFX.wrong();dp({type:'WRONG'});dp({type:'NEXT_Q'});
-    TTS.after(()=>{const s=stRef.current;return s.round===1&&s.r1tRun?s.curQ?.question:null},2000)};
+    TTS.after(()=>{const s=stRef.current;return s.round===1&&s.r1tRun?s.curQ?.question:null},1000)};
 const r1Skip=()=>{dp({type:'SKIP'});dp({type:'NEXT_Q'});
-    TTS.after(()=>{const s=stRef.current;return s.round===1&&s.r1tRun?s.curQ?.question:null},2000)};
+    TTS.after(()=>{const s=stRef.current;return s.round===1&&s.r1tRun?s.curQ?.question:null},1000)};
 const r2Correct=()=>{SFX.correct();dp({type:'CORRECT'})};
 const r2Wrong=()=>{SFX.wrong();dp({type:'WRONG'})};
 const r2Super=()=>{TTS.stop();dp({type:'PASS_SUPER'})};
