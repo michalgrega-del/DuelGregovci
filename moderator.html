@@ -9,7 +9,7 @@
 <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-<script src="questions.js"></script>
+<script src="questions.js?v=20260301"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 body{font-family:'Inter',system-ui,sans-serif;margin:0;transition:background .3s,color .3s}
@@ -51,12 +51,19 @@ accent:'#eab308',p1:'#3b82f6',p2:'#ef4444',ok:'#22c55e',err:'#ef4444',
 <script>
 /* Safety: ensure QUESTIONS_DB is on window for Babel standalone access */
 if(typeof QUESTIONS_DB!=='undefined'&&!window.QUESTIONS_DB)window.QUESTIONS_DB=QUESTIONS_DB;
-if(!window.QUESTIONS_DB||!window.QUESTIONS_DB.length)console.error('[QUIZ] QUESTIONS_DB not loaded!',typeof QUESTIONS_DB);
+console.log('[QUIZ] QUESTIONS_DB check:', !!window.QUESTIONS_DB, window.QUESTIONS_DB?window.QUESTIONS_DB.length:0);
+if(!window.QUESTIONS_DB||!window.QUESTIONS_DB.length){
+  console.error('[QUIZ] QUESTIONS_DB not loaded! typeof=',typeof QUESTIONS_DB);
+  alert('CHYBA: Databáza otázok sa nenačítala! Skúste Ctrl+Shift+R (hard refresh).');
+}
 </script>
 <script type="text/babel">
 // ================================================================
 //  Vedomostný QUIZ 2026 – Moderátor
 // ================================================================
+/* Explicitly pull QUESTIONS_DB from window into Babel scope */
+const QUESTIONS_DB = window.QUESTIONS_DB;
+if(!QUESTIONS_DB||!QUESTIONS_DB.length){console.error('[BABEL] QUESTIONS_DB not available!');}
 const{useState,useReducer,useContext,createContext,useEffect,useRef,useCallback,useMemo}=React;
 
 /* ─── CONSTANTS ─── */
