@@ -3,7 +3,7 @@
    Cache-first s network fallback, auto-update
    ══════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'quiz-2026-v3';
+const CACHE_NAME = 'quiz-2026-v4';
 const LOCAL_ASSETS = [
   './',
   './moderator.html',
@@ -50,21 +50,41 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-/* ── Fetch: cache-first, fallback to network, then cache result ── */
+/* ── Fetch: network-first for local HTML, cache-first for CDN, skip Firebase ── */
 self.addEventListener('fetch', event => {
   /* Skip non-GET requests */
   if (event.request.method !== 'GET') return;
 
+  const url = event.request.url;
+
+  /* NEVER intercept Firebase / Firestore / Google APIs */
+  if (url.includes('firestore.googleapis.com') ||
+      url.includes('firebase') ||
+      url.includes('identitytoolkit') ||
+      url.includes('securetoken')) return;
+
+  /* Network-first for local HTML files (so updates arrive immediately) */
+  const isHTML = url.endsWith('.html') || url.endsWith('/');
+  if (isHTML) {
+    event.respondWith(
+      fetch(event.request).then(response => {
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  /* Cache-first for CDN / static assets */
   event.respondWith(
     caches.match(event.request).then(cached => {
-      /* Return cached version immediately */
       const fetchPromise = fetch(event.request).then(response => {
-        /* Cache successful responses for next time */
         if (response && response.status === 200 && response.type !== 'opaque') {
           const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, clone);
-          });
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
         return response;
       }).catch(() => cached);
