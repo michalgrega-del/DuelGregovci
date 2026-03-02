@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e293b"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#eab308"/>
+      <stop offset="100%" style="stop-color:#f59e0b"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <rect x="16" y="16" width="480" height="480" rx="80" fill="none" stroke="url(#gold)" stroke-width="4" opacity="0.3"/>
+  <text x="256" y="260" font-family="Arial,Helvetica,sans-serif" font-size="240" font-weight="900" text-anchor="middle" dominant-baseline="central" fill="url(#gold)" filter="url(#glow)">Q</text>
+  <text x="256" y="430" font-family="Arial,Helvetica,sans-serif" font-size="72" font-weight="700" text-anchor="middle" fill="#94a3b8">2026</text>
+  <circle cx="400" cy="112" r="40" fill="#3b82f6" opacity="0.8"/>
+  <text x="400" y="112" font-family="Arial,sans-serif" font-size="36" font-weight="900" text-anchor="middle" dominant-baseline="central" fill="white">?</text>
+  <circle cx="112" cy="112" r="40" fill="#ef4444" opacity="0.8"/>
+  <text x="112" y="112" font-family="Arial,sans-serif" font-size="36" font-weight="900" text-anchor="middle" dominant-baseline="central" fill="white">!</text>
+</svg>

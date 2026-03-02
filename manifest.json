@@ -1,0 +1,21 @@
+{
+  "name": "Vedomostný QUIZ 2026",
+  "short_name": "QUIZ 2026",
+  "description": "Rodinná vedomostná súťaž – 3 kolá, rozstrel, štatistiky",
+  "start_url": "./moderator.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#eab308",
+  "lang": "sk",
+  "categories": ["games", "education"],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

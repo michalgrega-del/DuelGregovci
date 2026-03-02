@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Vedomostný QUIZ 2026 – Moderátor</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#eab308">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="QUIZ 2026">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
@@ -279,9 +286,12 @@ hist.slice(-10).forEach(h=>{if(h.usedQIds)h.usedQIds.forEach(id=>ids.add(id))});
 return ids;
 }
 function pickQ(diff,usedIds,cat=null,type=null,scope='sk'){
+/* Primárny pool: správna obtiažnosť + nepoužité */
 let pool=QUESTIONS_DB.filter(q=>q.difficulty===diff&&q.scope===scope&&!usedIds.has(q.id)&&(cat?q.category===cat:true)&&(type?q.type===type:q.type!=='tiebreaker'));
-if(!pool.length)pool=QUESTIONS_DB.filter(q=>q.difficulty===diff&&q.scope===scope&&(cat?q.category===cat:true)&&(type?q.type===type:q.type!=='tiebreaker'));
-return pool.length?pool[Math.floor(Math.random()*pool.length)]:null;
+/* Ak v danej obtiažnosti nie sú, skús ľubovoľnú obtiažnosť (ale stále nepoužité!) */
+if(!pool.length)pool=QUESTIONS_DB.filter(q=>q.scope===scope&&!usedIds.has(q.id)&&(cat?q.category===cat:true)&&(type?q.type===type:q.type!=='tiebreaker'));
+if(!pool.length){console.warn('[QUIZ] Žiadne nové otázky pre:',{diff,cat,type,scope});return null;}
+return pool[Math.floor(Math.random()*pool.length)];
 }
 function getCats(diff,round,roundCats,scope){
 if(roundCats&&roundCats.length)return roundCats.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&q.scope===scope&&q.type!=='tiebreaker'));
@@ -1782,6 +1792,22 @@ switch(st.screen){
 }
 }
 ReactDOM.createRoot(document.getElementById('root')).render(<Provider><App/></Provider>);
+</script>
+<script>
+/* ── PWA Service Worker Registration ── */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js').then(reg=>{
+      console.log('[PWA] Service Worker registered, scope:',reg.scope);
+      reg.addEventListener('updatefound',()=>{
+        const nw=reg.installing;
+        nw.addEventListener('statechange',()=>{
+          if(nw.state==='activated')console.log('[PWA] New version activated');
+        });
+      });
+    }).catch(err=>console.warn('[PWA] SW registration failed:',err));
+  });
+}
 </script>
 </body>
 </html>
