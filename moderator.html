@@ -193,6 +193,7 @@ console.log('[Firebase] Initialized, project:',firebaseConfig.projectId);
 
 /* ─── STORAGE (localStorage + Firestore cloud sync) ─── */
 const S={
+  _ready:false, _readyCbs:[],
   g(k,d=null){try{const v=localStorage.getItem('duel_'+k);return v?JSON.parse(v):d}catch{return d}},
   s(k,v){
     try{localStorage.setItem('duel_'+k,JSON.stringify(v))}catch(e){console.warn(e)}
@@ -206,15 +207,20 @@ const S={
   listen(k,cb){
     if(this._subs[k])return;
     this._subs[k]=db.collection('quiz_data').doc(k).onSnapshot(snap=>{
-      if(!snap.exists)return;
+      if(!snap.exists){
+        /* Firestore empty → bootstrap from localStorage */
+        const local=this.g(k);
+        if(local&&(Array.isArray(local)?local.length>0:Object.keys(local).length>0)){
+          console.log('[Cloud] Bootstrap: pushing local',k,'to Firestore');
+          db.collection('quiz_data').doc(k).set({value:JSON.parse(JSON.stringify(local)),ts:firebase.firestore.FieldValue.serverTimestamp()});
+        }
+        return;
+      }
       const d=snap.data();
       if(d&&d.value!==undefined){
-        const local=this.g(k);
-        if(JSON.stringify(local)!==JSON.stringify(d.value)){
-          console.log('[Cloud] Received update:',k);
-          try{localStorage.setItem('duel_'+k,JSON.stringify(d.value))}catch(e){}
-          if(cb)cb(d.value);
-        }
+        console.log('[Cloud] Received:',k);
+        try{localStorage.setItem('duel_'+k,JSON.stringify(d.value))}catch(e){}
+        if(cb)cb(d.value);
       }
     },e=>console.warn('[Cloud] Listen error:',k,e));
   }
@@ -727,12 +733,36 @@ const Card=({children,cls=''})=><div className={`rounded-2xl p-5 border ${cls}`}
 /* ════════════ HOME ════════════ */
 function HomeScreen(){
 const{st,dp}=use$();
+const[cloudOk,setCloudOk]=useState(false);
+const[syncing,setSyncing]=useState(false);
+useEffect(()=>{
+    db.collection('quiz_data').doc('players').get()
+      .then(()=>setCloudOk(true))
+      .catch(()=>setCloudOk(false));
+},[]);
+const pushToCloud=()=>{
+    setSyncing(true);
+    Promise.all([
+      S.s('players',st.players),
+      S.s('history',st.history),
+      S.s('settings',st.settings),
+    ]);
+    setTimeout(()=>setSyncing(false),1500);
+};
 return(
 <div className="flex flex-col items-center justify-center min-h-screen gap-6 p-6">
     <div className="anim-float text-center">
         <h1 className="text-5xl font-black tracking-tight text-accent mb-2" style={{textShadow:'0 0 60px rgba(234,179,8,.4)'}}>Vedomostný QUIZ 2026</h1>
     </div>
-    <p style={{color:'var(--textSub)'}} className="text-lg mb-8">Rodinná vedomostná súťaž</p>
+    <p style={{color:'var(--textSub)'}} className="text-lg mb-2">Rodinná vedomostná súťaž</p>
+    {/* Cloud status */}
+    <div className="flex items-center gap-2 text-sm mb-6">
+        <span className={`w-2 h-2 rounded-full ${cloudOk?'bg-green-400':'bg-red-400'}`}></span>
+        <span style={{color:'var(--textSub)'}}>{cloudOk?'Cloud sync aktívny':'Pripájam…'}</span>
+        <button onClick={pushToCloud} className="ml-2 text-xs px-2 py-1 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 transition-colors" disabled={syncing}>
+            {syncing?'⏳ Synchronizujem…':'☁️ Sync do cloudu'}
+        </button>
+    </div>
     <div className="flex flex-col gap-3 w-80">
         <Btn cls="bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 text-lg py-4 shadow-lg shadow-yellow-500/20" onClick={()=>dp({type:'NAV',to:'setup'})}>🎮 Nová hra</Btn>
         <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'players'})}>👤 Hráči</Btn>
@@ -740,6 +770,7 @@ return(
         <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'hist'})}>📋 História</Btn>
         <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'settings'})}>⚙️ Nastavenia</Btn>
     </div>
+    <p className="text-xs mt-4" style={{color:'var(--border)'}}>v2.1-cloud</p>
 </div>
 );
 }
@@ -1884,18 +1915,22 @@ return <Provider><App/></Provider>;
 ReactDOM.createRoot(document.getElementById('root')).render(<Root/>);
 </script>
 <script>
-/* ── PWA Service Worker Registration (auto-reload on update) ── */
+/* ── Force SW update on load ── */
 if('serviceWorker' in navigator){
   let refreshing=false;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{
-    if(!refreshing){refreshing=true;console.log('[PWA] New SW active, reloading…');window.location.reload()}
+    if(!refreshing){refreshing=true;console.log('[PWA] New SW, reloading…');window.location.reload()}
+  });
+  /* Immediately try to update any existing SW */
+  navigator.serviceWorker.getRegistration().then(reg=>{
+    if(reg){console.log('[PWA] Forcing SW update check…');reg.update();}
   });
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').then(reg=>{
-      console.log('[PWA] Service Worker registered, scope:',reg.scope);
-      /* Check for updates every 60s */
+      console.log('[PWA] SW registered, scope:',reg.scope);
+      reg.update(); /* force check right away */
       setInterval(()=>reg.update(),60000);
-    }).catch(err=>console.warn('[PWA] SW registration failed:',err));
+    }).catch(err=>console.warn('[PWA] SW failed:',err));
   });
 }
 </script>
