@@ -16,6 +16,8 @@
 <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="questions.js?v=20260301"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -176,10 +178,46 @@ function pickRoundCats(diff,scope,n=10){
     return shuffled.slice(0,n);
 }
 
-/* ─── STORAGE ─── */
+/* ─── FIREBASE ─── */
+const firebaseConfig={
+  apiKey:"AIzaSyDxGUT8PB1rxNsfVsDxdAZmdKMlWBwdJrw",
+  authDomain:"vedomostna-hra-2026.firebaseapp.com",
+  projectId:"vedomostna-hra-2026",
+  storageBucket:"vedomostna-hra-2026.firebasestorage.app",
+  messagingSenderId:"460121621924",
+  appId:"1:460121621924:web:5b1699df44371bb3ec2d31"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+console.log('[Firebase] Initialized, project:',firebaseConfig.projectId);
+
+/* ─── STORAGE (localStorage + Firestore cloud sync) ─── */
 const S={
-g(k,d=null){try{const v=localStorage.getItem('duel_'+k);return v?JSON.parse(v):d}catch{return d}},
-s(k,v){try{localStorage.setItem('duel_'+k,JSON.stringify(v))}catch(e){console.warn(e)}}
+  g(k,d=null){try{const v=localStorage.getItem('duel_'+k);return v?JSON.parse(v):d}catch{return d}},
+  s(k,v){
+    try{localStorage.setItem('duel_'+k,JSON.stringify(v))}catch(e){console.warn(e)}
+    /* Cloud sync → Firestore */
+    try{db.collection('quiz_data').doc(k).set({value:JSON.parse(JSON.stringify(v)),ts:firebase.firestore.FieldValue.serverTimestamp()})
+      .then(()=>console.log('[Cloud] Saved:',k))
+      .catch(e=>console.warn('[Cloud] Save failed:',k,e))}catch(e){console.warn('[Cloud] Sync error:',e)}
+  },
+  /* Subscribe to Firestore changes (called once at app start) */
+  _subs:{},
+  listen(k,cb){
+    if(this._subs[k])return;
+    this._subs[k]=db.collection('quiz_data').doc(k).onSnapshot(snap=>{
+      if(!snap.exists)return;
+      const d=snap.data();
+      if(d&&d.value!==undefined){
+        const local=this.g(k);
+        if(JSON.stringify(local)!==JSON.stringify(d.value)){
+          console.log('[Cloud] Received update:',k);
+          try{localStorage.setItem('duel_'+k,JSON.stringify(d.value))}catch(e){}
+          if(cb)cb(d.value);
+        }
+      }
+    },e=>console.warn('[Cloud] Listen error:',k,e));
+  }
 };
 
 /* ─── AUDIO ─── */
@@ -570,6 +608,16 @@ return st;
 case 'FORCE_R1_END':
 return{...st,showRoundSummary:true,summaryRound:1,r1tRun:false,curQ:null,answered:false,revealed:false};
 
+/* ── Cloud sync incoming ── */
+case '_CLOUD_PLAYERS':return st.gameOn?st:{...st,players:a.v||[]};
+case '_CLOUD_HISTORY':return st.gameOn?st:{...st,history:a.v||[]};
+case '_CLOUD_SETTINGS':{
+    const s=a.v||st.settings;
+    SFX.enabled=s.sound;
+    if(s.theme!==undefined)applyTheme(s.theme);
+    return{...st,settings:s};
+}
+
 default:return st;
 }
 }
@@ -655,6 +703,14 @@ useEffect(()=>{
 useEffect(()=>{
     SFX.enabled=st.settings.sound;
     applyTheme(st.settings.theme||'dark');
+},[]);
+
+/* ── Cloud sync: listen for remote changes ── */
+useEffect(()=>{
+    console.log('[Cloud] Starting Firestore listeners…');
+    S.listen('players',(val)=>{dp({type:'_CLOUD_PLAYERS',v:val})});
+    S.listen('history',(val)=>{dp({type:'_CLOUD_HISTORY',v:val})});
+    S.listen('settings',(val)=>{dp({type:'_CLOUD_SETTINGS',v:val})});
 },[]);
 
 return <Ctx.Provider value={{st,dp}}>{children}</Ctx.Provider>;

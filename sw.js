@@ -3,7 +3,7 @@
    Cache-first s network fallback, auto-update
    ══════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'quiz-2026-v2';
+const CACHE_NAME = 'quiz-2026-v3';
 const LOCAL_ASSETS = [
   './',
   './moderator.html',
@@ -18,6 +18,8 @@ const CDN_ASSETS = [
   'https://unpkg.com/@babel/standalone@7/babel.min.js',
   'https://cdn.tailwindcss.com',
   'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js',
+  'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js',
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap'
 ];
 

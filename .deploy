@@ -1,0 +1,10 @@
+# DEPLOY CONFIG
+# Po každej úprave kódu vždy:
+# 1. git add -A && git commit -m "popis zmeny" && git push origin main
+# 2. surge . duel-gregovci.surge.sh
+#
+# LIVE URL: https://duel-gregovci.surge.sh
+# Moderátor: https://duel-gregovci.surge.sh/moderator.html
+# TV: https://duel-gregovci.surge.sh/tv.html
+# Login: mgrega / Nowire2086*
+# GitHub repo: https://github.com/michalgrega-del/DuelGregovci
