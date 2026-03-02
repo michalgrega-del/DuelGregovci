@@ -1791,7 +1791,41 @@ switch(st.screen){
     default:return <HomeScreen/>;
 }
 }
-ReactDOM.createRoot(document.getElementById('root')).render(<Provider><App/></Provider>);
+/* ═══════════════ LOGIN SCREEN ═══════════════ */
+function LoginScreen({onLogin}){
+const[user,setUser]=useState('');
+const[pass,setPass]=useState('');
+const[err,setErr]=useState('');
+const[show,setShow]=useState(false);
+const handle=e=>{
+e.preventDefault();
+if(user==='mgrega'&&pass==='Nowire2086*'){sessionStorage.setItem('quiz_auth','1');onLogin();}
+else{setErr('Nesprávne meno alebo heslo!');setTimeout(()=>setErr(''),2500);}
+};
+return(
+<div style={{background:'linear-gradient(135deg,#0f172a,#1e293b)',minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Inter,system-ui,sans-serif'}}>
+<form onSubmit={handle} style={{background:'#1e293b',border:'2px solid #334155',borderRadius:'24px',padding:'48px',maxWidth:'400px',width:'100%',textAlign:'center',boxShadow:'0 25px 60px rgba(0,0,0,.5)'}}>
+<div style={{fontSize:'64px',marginBottom:'12px'}}>🔐</div>
+<h1 style={{color:'#eab308',fontSize:'28px',fontWeight:900,marginBottom:'8px'}}>QUIZ 2026</h1>
+<p style={{color:'#94a3b8',marginBottom:'32px',fontSize:'14px'}}>Prihlás sa pre prístup</p>
+{err&&<div style={{background:'#ef444420',border:'1px solid #ef4444',borderRadius:'12px',padding:'10px',color:'#ef4444',fontWeight:600,marginBottom:'16px',animation:'scale-pop .3s ease-out'}}>{err}</div>}
+<input value={user} onChange={e=>setUser(e.target.value)} placeholder="Meno" autoComplete="username" style={{width:'100%',padding:'14px 18px',borderRadius:'12px',border:'2px solid #475569',background:'#334155',color:'#fff',fontSize:'16px',marginBottom:'12px',outline:'none',boxSizing:'border-box'}} autoFocus/>
+<div style={{position:'relative',marginBottom:'24px'}}>
+<input value={pass} onChange={e=>setPass(e.target.value)} placeholder="Heslo" type={show?'text':'password'} autoComplete="current-password" style={{width:'100%',padding:'14px 18px',paddingRight:'50px',borderRadius:'12px',border:'2px solid #475569',background:'#334155',color:'#fff',fontSize:'16px',outline:'none',boxSizing:'border-box'}}/>
+<span onClick={()=>setShow(!show)} style={{position:'absolute',right:'14px',top:'50%',transform:'translateY(-50%)',cursor:'pointer',fontSize:'20px',userSelect:'none'}}>{show?'🙈':'👁️'}</span>
+</div>
+<button type="submit" style={{width:'100%',padding:'14px',borderRadius:'12px',background:'linear-gradient(135deg,#eab308,#f59e0b)',color:'#0f172a',fontSize:'18px',fontWeight:800,border:'none',cursor:'pointer',transition:'transform .2s',boxSizing:'border-box'}} onMouseOver={e=>e.target.style.transform='translateY(-2px)'} onMouseOut={e=>e.target.style.transform='none'}>Prihlásiť sa</button>
+</form>
+</div>
+);}
+
+/* ═══════════════ ROOT WITH AUTH GATE ═══════════════ */
+function Root(){
+const[auth,setAuth]=useState(()=>sessionStorage.getItem('quiz_auth')==='1');
+if(!auth)return <LoginScreen onLogin={()=>setAuth(true)}/>;
+return <Provider><App/></Provider>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Root/>);
 </script>
 <script>
 /* ── PWA Service Worker Registration ── */
