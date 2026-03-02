@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vedomostný QUIZ 2026</title>
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#eab308">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: #f8fafc;
+    }
+    .container {
+      text-align: center;
+      padding: 2rem;
+    }
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(90deg, #eab308, #f59e0b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    p { color: #94a3b8; margin-bottom: 2rem; font-size: 1.1rem; }
+    .links {
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    a {
+      display: inline-block;
+      padding: 1rem 2.5rem;
+      border-radius: 12px;
+      text-decoration: none;
+      font-size: 1.2rem;
+      font-weight: 600;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    a:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+    .mod {
+      background: linear-gradient(135deg, #eab308, #f59e0b);
+      color: #0f172a;
+    }
+    .tv {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🏆 Vedomostný QUIZ 2026</h1>
+    <p>Vyber rozhranie:</p>
+    <div class="links">
+      <a href="./moderator.html" class="mod">🎙️ Moderátor</a>
+      <a href="./tv.html" class="tv">📺 TV Obrazovka</a>
+    </div>
+  </div>
+</body>
+</html>
