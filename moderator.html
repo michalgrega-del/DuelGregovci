@@ -47,6 +47,13 @@ body{font-family:'Inter',system-ui,sans-serif;margin:0;transition:background .3s
 .cat-card:hover{transform:translateY(-3px);box-shadow:0 8px 25px rgba(0,0,0,.3)}
 .junior-bg{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460)}
 .standard-bg{background:linear-gradient(180deg,#0a0a1a,#0f172a,#0a0a1a)}
+@keyframes screen-enter{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.screen-enter{animation:screen-enter .3s ease-out}
+.answer-blur{filter:blur(8px);transition:filter .3s;cursor:pointer;user-select:none}
+.answer-blur:hover{filter:blur(4px)}
+.answer-clear{filter:none;transition:filter .3s}
+.kbd{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;padding:0 5px;border-radius:5px;font-size:10px;font-weight:700;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:var(--textSub);margin:0 2px}
+@media(max-width:640px){.game-grid-cols{grid-template-columns:1fr!important}}
 </style>
 <script>
 tailwind.config={theme:{extend:{colors:{
@@ -182,8 +189,8 @@ const SVET_CATS=['dejiny_svet','geografia_svet','hlavne_mesta','sport_svet','ope
     'informatika_svet','astronomia','zaujimavosti_svet','olympijske_hry','kulinarka'];
 const SCOPE_CATS={sk:SK_CATS,svet:SVET_CATS};
 function pickRoundCats(diff,scope,n=10){
-    const base=SCOPE_CATS[scope]||SK_CATS;
-    const avail=base.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&q.scope===scope&&q.type!=='tiebreaker'));
+    const base=scope==='mix'?[...new Set([...SK_CATS,...SVET_CATS])]:(SCOPE_CATS[scope]||SK_CATS);
+    const avail=base.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&(scope==='mix'||q.scope===scope)&&q.type!=='tiebreaker'));
     const shuffled=[...avail].sort(()=>Math.random()-.5);
     return shuffled.slice(0,n);
 }
@@ -373,17 +380,19 @@ hist.slice(-10).forEach(h=>{if(h.usedQIds)h.usedQIds.forEach(id=>ids.add(id))});
 return ids;
 }
 function pickQ(diff,usedIds,cat=null,type=null,scope='sk'){
+const _sf=scope==='mix'?(()=>true):(q=>q.scope===scope);
 /* Primárny pool: správna obtiažnosť + nepoužité */
-let pool=QUESTIONS_DB.filter(q=>q.difficulty===diff&&q.scope===scope&&!usedIds.has(q.id)&&(cat?q.category===cat:true)&&(type?q.type===type:q.type!=='tiebreaker'));
+let pool=QUESTIONS_DB.filter(q=>q.difficulty===diff&&_sf(q)&&!usedIds.has(q.id)&&(cat?q.category===cat:true)&&(type?q.type===type:q.type!=='tiebreaker'));
 /* Ak v danej obtiažnosti nie sú, skús ľubovoľnú obtiažnosť (ale stále nepoužité!) */
-if(!pool.length)pool=QUESTIONS_DB.filter(q=>q.scope===scope&&!usedIds.has(q.id)&&(cat?q.category===cat:true)&&(type?q.type===type:q.type!=='tiebreaker'));
+if(!pool.length)pool=QUESTIONS_DB.filter(q=>_sf(q)&&!usedIds.has(q.id)&&(cat?q.category===cat:true)&&(type?q.type===type:q.type!=='tiebreaker'));
 if(!pool.length){console.warn('[QUIZ] Žiadne nové otázky pre:',{diff,cat,type,scope});return null;}
 return pool[Math.floor(Math.random()*pool.length)];
 }
 function getCats(diff,round,roundCats,scope){
-if(roundCats&&roundCats.length)return roundCats.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&q.scope===scope&&q.type!=='tiebreaker'));
-const base=SCOPE_CATS[scope||'sk']||SK_CATS;
-return base.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&q.scope===scope&&q.type!=='tiebreaker'));
+const _sf=scope==='mix'?(()=>true):(q=>q.scope===scope);
+if(roundCats&&roundCats.length)return roundCats.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&_sf(q)&&q.type!=='tiebreaker'));
+const base=scope==='mix'?[...new Set([...SK_CATS,...SVET_CATS])]:(SCOPE_CATS[scope||'sk']||SK_CATS);
+return base.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&_sf(q)&&q.type!=='tiebreaker'));
 }
 function applyTheme(t){
 if(t==='light')document.body.classList.add('light');
@@ -410,6 +419,8 @@ passing:false, /* "odpoveď super" – opponent answering */
 originalActive:1, /* who originally had the question */
 tbWinner:null, /* víťaz rozstrelu pred zobrazením výsledkov */
 feedback:null, /* 'correct' | 'wrong' | null – TV feedback overlay */
+askedQuestions:[], /* tracked questions for post-game review */
+totalRounds:3, /* configurable: 1, 2, or 3 rounds */
 _undoStack:[], /* stack of {s1,s2,stats,answered,active,passing,feedback} snapshots for undo */
 stats:{r1:{p1c:0,p1w:0,p2c:0,p2w:0},r2:{p1c:0,p1w:0,p2c:0,p2w:0},r3:{p1c:0,p1w:0,p2c:0,p2w:0}},
 };
@@ -421,8 +432,8 @@ const R2_TIMER=st.settings?.timer||R2_TIMER_DEFAULT;
 switch(a.type){
 case 'NAV':return{...st,screen:a.to};
 case 'SET_TEST':return{...st,testMode:a.v};
-case 'ADD_P':{const ps=[...st.players,{id:Date.now(),name:a.name,age:a.age,ts:new Date().toISOString()}];S.s('players',ps);return{...st,players:ps}}
-case 'EDIT_P':{const ps=st.players.map(p=>p.id===a.id?{...p,name:a.name,age:a.age}:p);S.s('players',ps);return{...st,players:ps}}
+case 'ADD_P':{const ps=[...st.players,{id:Date.now(),name:a.name,age:a.age,avatar:a.avatar||'👤',ts:new Date().toISOString()}];S.s('players',ps);return{...st,players:ps}}
+case 'EDIT_P':{const ps=st.players.map(p=>p.id===a.id?{...p,name:a.name,age:a.age,avatar:a.avatar||p.avatar||'👤'}:p);S.s('players',ps);return{...st,players:ps}}
 case 'DEL_P':{const ps=st.players.filter(p=>p.id!==a.id);S.s('players',ps);return{...st,players:ps}}
 case 'SETUP':return{...st,...a.d};
 
@@ -438,7 +449,7 @@ return{...st,screen:'game',gameOn:true,over:false,
     r1phase:1,r1qCount:0,r1timer:R1_TIME,r1tRun:false,
     showRoundSummary:false,summaryRound:null,
     usedCats:[],roundCats:[],catQCounts:{},passing:false,originalActive:1,tbWinner:null,
-    stats:{r1:{p1c:0,p1w:0,p2c:0,p2w:0},r2:{p1c:0,p1w:0,p2c:0,p2w:0},r3:{p1c:0,p1w:0,p2c:0,p2w:0}}}}
+    stats:{r1:{p1c:0,p1w:0,p2c:0,p2w:0},r2:{p1c:0,p1w:0,p2c:0,p2w:0},r3:{p1c:0,p1w:0,p2c:0,p2w:0}},askedQuestions:[]}}
 
 /* ── START GAME at Round 2 ── */
 case 'START_GAME_R2':{
@@ -452,7 +463,7 @@ return{...st,screen:'game',gameOn:true,over:false,
     r1phase:2,r1qCount:0,r1timer:0,r1tRun:false,
     showRoundSummary:false,summaryRound:null,
     usedCats:[],roundCats:rc2,catQCounts:{},passing:false,tbWinner:null,
-    stats:{r1:{p1c:0,p1w:0,p2c:0,p2w:0},r2:{p1c:0,p1w:0,p2c:0,p2w:0},r3:{p1c:0,p1w:0,p2c:0,p2w:0}}}}
+    stats:{r1:{p1c:0,p1w:0,p2c:0,p2w:0},r2:{p1c:0,p1w:0,p2c:0,p2w:0},r3:{p1c:0,p1w:0,p2c:0,p2w:0}},askedQuestions:[]}}
 
 /* ── R1 Timer ── */
 case 'R1_START':return{...st,r1tRun:true};
@@ -479,11 +490,12 @@ const p=st.active;
 const rk=st.round===1?'r1':st.round===2?'r2':'r3';
 const sk=p===1?'p1c':'p2c';
 const newStats={...st.stats,[rk]:{...st.stats[rk],[sk]:st.stats[rk][sk]+1}};
+const _aq=[...st.askedQuestions,{q:st.curQ?.question,a:st.curQ?.answer,cat:st.curQ?.category,ok:true,who:p,round:st.round,pts:st.round===1?10:st.pts}];
 if(st.round===1){
-    return{...st,s1:p===1?st.s1+10:st.s1,s2:p===2?st.s2+10:st.s2,answered:true,stats:newStats,_undoStack:[...st._undoStack,snap].slice(-10)}
+    return{...st,s1:p===1?st.s1+10:st.s1,s2:p===2?st.s2+10:st.s2,answered:true,stats:newStats,askedQuestions:_aq,_undoStack:[...st._undoStack,snap].slice(-10)}
 }
 const pv=st.pts;
-return{...st,s1:p===1?st.s1+pv:st.s1,s2:p===2?st.s2+pv:st.s2,answered:true,tRun:false,passing:false,stats:newStats,feedback:'correct',revealed:true,_undoStack:[...st._undoStack,snap].slice(-10)}
+return{...st,s1:p===1?st.s1+pv:st.s1,s2:p===2?st.s2+pv:st.s2,answered:true,tRun:false,passing:false,stats:newStats,feedback:'correct',revealed:true,askedQuestions:_aq,_undoStack:[...st._undoStack,snap].slice(-10)}
 }
 
 /* ── WRONG ── */
@@ -493,11 +505,12 @@ const p=st.active;
 const rk=st.round===1?'r1':st.round===2?'r2':'r3';
 const sk=p===1?'p1w':'p2w';
 const newStats={...st.stats,[rk]:{...st.stats[rk],[sk]:st.stats[rk][sk]+1}};
+const _aq=[...st.askedQuestions,{q:st.curQ?.question,a:st.curQ?.answer,cat:st.curQ?.category,ok:false,who:p,round:st.round,pts:st.round===1?10:st.pts}];
 if(st.round===1){
-    return{...st,answered:true,stats:newStats,_undoStack:[...st._undoStack,snap].slice(-10)}
+    return{...st,answered:true,stats:newStats,askedQuestions:_aq,_undoStack:[...st._undoStack,snap].slice(-10)}
 }
 const pv=st.pts;
-return{...st,s1:p===1?st.s1-pv:st.s1,s2:p===2?st.s2-pv:st.s2,answered:true,tRun:false,passing:false,stats:newStats,feedback:'wrong',revealed:true,_undoStack:[...st._undoStack,snap].slice(-10)}
+return{...st,s1:p===1?st.s1-pv:st.s1,s2:p===2?st.s2-pv:st.s2,answered:true,tRun:false,passing:false,stats:newStats,feedback:'wrong',revealed:true,askedQuestions:_aq,_undoStack:[...st._undoStack,snap].slice(-10)}
 }
 
 /* ── UNDO last CORRECT/WRONG ── */
@@ -583,6 +596,18 @@ return st;
 
 /* ── NEXT ROUND (from summary) ── */
 case 'NEXT_ROUND':{
+const _tr=st.totalRounds||3;
+/* If we reached the last configured round, go to results or tiebreaker */
+if(st.summaryRound>=_tr||st.summaryRound===3){
+    if(st.s1===st.s2){
+        const u2=new Set(st.usedIds),q=pickQ(st.diff,u2,null,'tiebreaker',st.scope);if(q)u2.add(q.id);
+        return{...st,round:'tiebreaker',qNum:0,curQ:q,usedIds:u2,active:1,
+            showRoundSummary:false,summaryRound:null,
+            tRun:false,tSec:R2_TIMER,pts:10,revealed:false,answered:false,selCat:null,tb1:'',tb2:'',passing:false}
+    }
+    const w=st.s1>st.s2?1:2;
+    return{...st,over:true,gameOn:false,winner:w,screen:'results',showRoundSummary:false,summaryRound:null}
+}
 if(st.summaryRound===1){
     const rc2=pickRoundCats(st.diff,st.scope,10);
     return{...st,round:2,qNum:0,curQ:null,active:1,originalActive:1,showRoundSummary:false,summaryRound:null,
@@ -592,16 +617,6 @@ if(st.summaryRound===2){
     const rc3=pickRoundCats(st.diff,st.scope,10);
     return{...st,round:3,qNum:0,curQ:null,active:2,originalActive:2,showRoundSummary:false,summaryRound:null,
         tRun:false,tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,usedCats:[],roundCats:rc3,catQCounts:{},passing:false}
-}
-if(st.summaryRound===3){
-    if(st.s1===st.s2){
-        const u2=new Set(st.usedIds),q=pickQ(st.diff,u2,null,'tiebreaker',st.scope);if(q)u2.add(q.id);
-        return{...st,round:'tiebreaker',qNum:0,curQ:q,usedIds:u2,active:1,
-            showRoundSummary:false,summaryRound:null,
-            tRun:false,tSec:R2_TIMER,pts:10,revealed:false,answered:false,selCat:null,tb1:'',tb2:'',passing:false}
-    }
-    const w=st.s1>st.s2?1:2;
-    return{...st,over:true,gameOn:false,winner:w,screen:'results',showRoundSummary:false,summaryRound:null}
 }
 return st;
 }
@@ -632,8 +647,8 @@ return{...st,over:true,gameOn:false,screen:'results'}
 /* ── Save/End ── */
 case 'SAVE':{
 const r={id:Date.now(),date:st.gameDate,p1:st.p1,p2:st.p2,s1:st.s1,s2:st.s2,
-    diff:st.diff,winner:st.winner===1?st.p1?.name:st.p2?.name,winnerId:st.winner===1?st.p1?.id:st.p2?.id,
-    stats:{...st.stats},usedQIds:[...st.usedIds]};
+    diff:st.diff,scope:st.scope||'sk',winner:st.winner===1?st.p1?.name:st.p2?.name,winnerId:st.winner===1?st.p1?.id:st.p2?.id,
+    stats:{...st.stats},usedQIds:[...st.usedIds],askedQuestions:st.askedQuestions||[]};
 const h=[...st.history,r];S.s('history',h);clearSavedGame();return{...st,history:h}}
 case 'END_GAME':
 clearSavedGame();
@@ -786,7 +801,7 @@ useEffect(()=>{
         active:st.active,picker:r3picker,tRun:st.tRun,tSec:st.tSec,tDur:TIMER,
         pts:st.pts,diff:st.diff,
         over:st.over,winner:st.winner,answered:st.answered,
-        r1phase:st.r1phase,r1timer:st.r1timer,r1tRun:st.r1tRun,
+        r1phase:st.r1phase,r1timer:st.r1timer,r1tRun:st.r1tRun,r1Total:R1_TIME,
         selCat:st.selCat,
         showRoundSummary:st.showRoundSummary,summaryRound:st.summaryRound,
         stats:st.stats,categories:availCats,usedCats:st.usedCats,catQCounts:st.catQCounts||{},
@@ -923,7 +938,7 @@ return(
         <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'settings'})}>⚙️ Nastavenia</Btn>
         <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'qeditor'})}>✏️ Editor otázok</Btn>
     </div>
-    <p className="text-xs mt-4" style={{color:'var(--border)'}}>v2.3-editor</p>
+    <p className="text-xs mt-4" style={{color:'var(--border)'}}>v3.0</p>
 </div>
 );
 }
@@ -933,12 +948,14 @@ function PlayersScreen(){
 const{st,dp}=use$();
 const[name,setName]=useState('');
 const[age,setAge]=useState('');
+const[avatar,setAvatar]=useState('👤');
 const[editId,setEditId]=useState(null);
+const AVATARS=['👤','🧑','👦','👧','👨','👩','🧓','👴','🦸','🧙','🧑‍🎓','🤴','👸','🧑‍🚀','🧑‍💻','🧜','🧚','🧑‍🎤','🧑‍🏫','👾'];
 const save=()=>{
     if(!name.trim())return;
-    if(editId){dp({type:'EDIT_P',id:editId,name:name.trim(),age:parseInt(age)||0});setEditId(null)}
-    else{dp({type:'ADD_P',name:name.trim(),age:parseInt(age)||0})}
-    setName('');setAge('');
+    if(editId){dp({type:'EDIT_P',id:editId,name:name.trim(),age:parseInt(age)||0,avatar});setEditId(null)}
+    else{dp({type:'ADD_P',name:name.trim(),age:parseInt(age)||0,avatar})}
+    setName('');setAge('');setAvatar('👤');
 };
 return(
 <div className="max-w-xl mx-auto p-6">
@@ -946,21 +963,27 @@ return(
     <h2 className="text-3xl font-bold mb-6">👤 Správa hráčov</h2>
     <Card cls="mb-6">
         <h3 className="font-semibold mb-3">{editId?'Upraviť hráča':'Pridať hráča'}</h3>
-        <div className="flex gap-2">
+        <div className="flex gap-2 mb-3">
             <input value={name} onChange={e=>setName(e.target.value)} placeholder="Meno"
                 className="flex-1 rounded-xl px-3 py-2 outline-none focus:ring-2 ring-accent" style={{background:'var(--inputBg)',color:'var(--text)'}} onKeyDown={e=>e.key==='Enter'&&save()}/>
             <input value={age} onChange={e=>setAge(e.target.value)} placeholder="Vek" type="number"
                 className="w-20 rounded-xl px-3 py-2 outline-none focus:ring-2 ring-accent" style={{background:'var(--inputBg)',color:'var(--text)'}}/>
             <Btn cls="bg-accent text-black hover:bg-yellow-400" onClick={save}>{editId?'Uložiť':'Pridať'}</Btn>
-            {editId&&<Btn cls="hover:opacity-80" style={{background:'var(--card2)'}} onClick={()=>{setEditId(null);setName('');setAge('')}}>Zrušiť</Btn>}
+            {editId&&<Btn cls="hover:opacity-80" style={{background:'var(--card2)'}} onClick={()=>{setEditId(null);setName('');setAge('');setAvatar('👤')}}>Zrušiť</Btn>}
+        </div>
+        <div className="flex gap-1 flex-wrap">
+            {AVATARS.map(a=>(
+                <button key={a} onClick={()=>setAvatar(a)}
+                    className={`w-9 h-9 rounded-lg text-xl flex items-center justify-center transition-all ${avatar===a?'bg-accent/30 ring-2 ring-accent scale-110':'hover:bg-white/10'}`}>{a}</button>
+            ))}
         </div>
     </Card>
     {st.players.length===0?<p style={{color:'var(--textSub)'}} className="text-center">Zatiaľ žiadni hráči.</p>:
     <div className="space-y-2">{st.players.map(p=>(
         <div key={p.id} className="rounded-xl p-3 flex items-center justify-between border" style={{background:'var(--card)',borderColor:'var(--border)'}}>
-            <div><span className="font-semibold">{p.name}</span><span style={{color:'var(--textSub)'}} className="ml-2 text-sm">{p.age} rokov</span></div>
+            <div className="flex items-center gap-2"><span className="text-2xl">{p.avatar||'👤'}</span><span className="font-semibold">{p.name}</span><span style={{color:'var(--textSub)'}} className="ml-1 text-sm">{p.age} rokov</span></div>
             <div className="flex gap-2">
-                <button onClick={()=>{setEditId(p.id);setName(p.name);setAge(p.age+'')}} className="text-blue-400 hover:text-blue-300 text-sm">✏️</button>
+                <button onClick={()=>{setEditId(p.id);setName(p.name);setAge(p.age+'');setAvatar(p.avatar||'👤')}} className="text-blue-400 hover:text-blue-300 text-sm">✏️</button>
                 <button onClick={()=>{if(confirm(`Odstrániť ${p.name}?`))dp({type:'DEL_P',id:p.id})}} className="text-red-400 hover:text-red-300 text-sm">🗑️</button>
             </div>
         </div>
@@ -978,11 +1001,12 @@ const[diff,setDiff]=useState(st.diff);
 const[date,setDate]=useState(st.gameDate);
 const[scope,setScope]=useState(st.scope||'sk');
 const[voiceGender,setVoiceGender]=useState(st.voiceGender||'male');
+const[rounds,setRounds]=useState(3);
 const canStart=p1id&&p2id&&p1id!==p2id;
 const doStart=(test=false)=>{
     const pl1=st.players.find(p=>p.id===+p1id),pl2=st.players.find(p=>p.id===+p2id);
     if(!pl1||!pl2)return;
-    dp({type:'SETUP',d:{p1:{id:pl1.id,name:pl1.name},p2:{id:pl2.id,name:pl2.name},diff,gameDate:date,scope,voiceGender}});
+    dp({type:'SETUP',d:{p1:{id:pl1.id,name:pl1.name,avatar:pl1.avatar||'👤'},p2:{id:pl2.id,name:pl2.name,avatar:pl2.avatar||'👤'},diff,gameDate:date,scope,voiceGender,totalRounds:rounds}});
     dp({type:'SET_TEST',v:test});
     TTS.setGender(voiceGender);
     SFX.gameStart();
@@ -991,7 +1015,7 @@ const doStart=(test=false)=>{
 const doStartR2=(test=false)=>{
     const pl1=st.players.find(p=>p.id===+p1id),pl2=st.players.find(p=>p.id===+p2id);
     if(!pl1||!pl2)return;
-    dp({type:'SETUP',d:{p1:{id:pl1.id,name:pl1.name},p2:{id:pl2.id,name:pl2.name},diff,gameDate:date,scope,voiceGender}});
+    dp({type:'SETUP',d:{p1:{id:pl1.id,name:pl1.name,avatar:pl1.avatar||'👤'},p2:{id:pl2.id,name:pl2.name,avatar:pl2.avatar||'👤'},diff,gameDate:date,scope,voiceGender,totalRounds:rounds}});
     dp({type:'SET_TEST',v:test});
     TTS.setGender(voiceGender);
     SFX.gameStart();
@@ -1035,11 +1059,26 @@ return(
                 <div className="flex gap-2">
                     <button onClick={()=>setScope('sk')}
                         className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${scope==='sk'?'bg-accent text-black shadow-lg shadow-yellow-500/20':'hover:opacity-80'}`}
-                        style={scope!=='sk'?{background:'var(--card2)'}:{}}>🇸🇰 SLOVENSKO</button>
+                        style={scope!=='sk'?{background:'var(--card2)'}:{}}>🇸🇰 SK</button>
                     <button onClick={()=>setScope('svet')}
                         className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${scope==='svet'?'bg-accent text-black shadow-lg shadow-yellow-500/20':'hover:opacity-80'}`}
                         style={scope!=='svet'?{background:'var(--card2)'}:{}}>🌍 SVET</button>
+                    <button onClick={()=>setScope('mix')}
+                        className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${scope==='mix'?'bg-accent text-black shadow-lg shadow-yellow-500/20':'hover:opacity-80'}`}
+                        style={scope!=='mix'?{background:'var(--card2)'}:{}}>🔀 MIX</button>
                 </div>
+            </div>
+            <div>
+                <label className="block text-sm mb-2" style={{color:'var(--textSub)'}}>Počet kôl</label>
+                <div className="flex gap-2">
+                    {[1,2,3].map(v=>(
+                        <button key={v} onClick={()=>setRounds(v)}
+                            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${rounds===v?'bg-accent text-black shadow-lg shadow-yellow-500/20':'hover:opacity-80'}`}
+                            style={rounds!==v?{background:'var(--card2)'}:{}}>
+                            {v} {v===1?'kolo':'kolá'}</button>
+                    ))}
+                </div>
+                <p className="text-xs mt-1" style={{color:'var(--textSub)'}}>{rounds===1?'Len rýchla runda (90s)':rounds===2?'Rýchla + hlavná runda':'Všetky 3 kolá'}</p>
             </div>
             <div>
                 <label className="block text-sm mb-2" style={{color:'var(--textSub)'}}>Hlas moderátora (TTS)</label>
@@ -1081,10 +1120,10 @@ return(
 <div>
     <p className="text-center mb-4">
         <span className={`font-bold text-xl ${activePlayer===1?'text-p1':'text-p2'}`}>
-            {activePlayer===1?'🔵':'🔴'} Hráč {activePlayer}
+            {activePlayer===1?'🔵':'🔴'} {activePlayer===1?'Hráč 1':'Hráč 2'}
         </span>
-        <span style={{color:'var(--textSub)'}} className="ml-2 text-lg">{isR3?'vyberá okruh pre':'vyberá okruh'}</span>
-        {isR3&&answererName&&<span className="font-bold text-xl ml-2">{answererName}</span>}
+        <span style={{color:'var(--textSub)'}} className="ml-2 text-lg">{isR3?'🎯 vyberá okruh pre':'🎯 vyberá okruh'}</span>
+        {isR3&&answererName&&<span className={`font-bold text-xl ml-2 px-3 py-1 rounded-xl ${activePlayer===1?'bg-red-500/20 text-p2':'bg-blue-500/20 text-p1'}`}>➡️ {answererName}</span>}
     </p>
     {cats.length===0?<p className="text-center text-accent text-lg font-bold py-8">Všetky okruhy boli použité!</p>:
     <div className="grid grid-cols-2 gap-3">
@@ -1357,6 +1396,40 @@ useEffect(()=>{
     }
     return()=>TTS.stop();
 },[ttsOn]);
+const[showAnswer,setShowAnswer]=useState(false);
+useEffect(()=>{setShowAnswer(false)},[st.curQ?.id,st.qNum,st.round]);
+/* Keyboard shortcuts */
+useEffect(()=>{
+    const h=(e)=>{
+        if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')return;
+        const s=stRef.current;
+        const k=e.key;
+        if(k==='c'||k==='C'){
+            if(s.round===1&&s.r1tRun&&!s.answered){SFX.correct();dp({type:'CORRECT'});dp({type:'NEXT_Q'})}
+            else if((s.round===2||s.round===3)&&s.curQ&&!s.answered){SFX.correct();dp({type:'CORRECT'})}
+        }else if(k==='n'||k==='N'){
+            if(s.round===1&&s.r1tRun&&!s.answered){SFX.wrong();dp({type:'WRONG'});dp({type:'NEXT_Q'})}
+            else if((s.round===2||s.round===3)&&s.curQ&&!s.answered){SFX.wrong();dp({type:'WRONG'})}
+        }else if(k==='d'||k==='D'){
+            if(s.round===1&&s.r1tRun){dp({type:'SKIP'});dp({type:'NEXT_Q'})}
+        }else if(k===' '){
+            e.preventDefault();
+            if(s.round===1&&!s.r1tRun&&s.curQ)dp({type:'R1_START'});
+        }else if(k==='ArrowRight'){
+            if(s.answered)dp({type:'NEXT_Q'});
+        }else if(k==='u'||k==='U'){
+            if(s._undoStack?.length)dp({type:'UNDO'});
+        }else if(k==='r'||k==='R'){
+            if(!s.revealed&&s.curQ)dp({type:'REVEAL'});
+        }else if(k==='s'||k==='S'){
+            if(!s.passing&&(s.round===2||s.round===3)&&s.curQ&&!s.answered)dp({type:'PASS_SUPER'});
+        }else if(k==='a'||k==='A'){
+            setShowAnswer(v=>!v);
+        }
+    };
+    window.addEventListener('keydown',h);
+    return()=>window.removeEventListener('keydown',h);
+},[]);
 /* ═══ END OF HOOKS – no more useState/useEffect/useMemo below this line ═══ */
 
 const openTVWindow=()=>{const L=window.screen.width;window.open('tv.html','QUIZ_TV',`width=1920,height=1080,left=${L},top=0,menubar=no,toolbar=no`)};
@@ -1470,7 +1543,7 @@ else if(st.showRoundSummary){
                 {st.s1===st.s2&&<p className="text-accent font-bold text-lg mb-4">⚖️ Remíza!</p>}
                 <Btn cls="bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 text-lg py-3 px-8 shadow-lg shadow-yellow-500/20"
                     onClick={()=>dp({type:'NEXT_ROUND'})}>
-                    {st.summaryRound<3?`▶ Pokračovať do ${st.summaryRound+1}. kola`:'🏁 Výsledky'}
+                    {st.summaryRound<(st.totalRounds||3)?`▶ Pokračovať do ${st.summaryRound+1}. kola`:'🏁 Výsledky'}
                 </Btn>
                 {jumpBtns}
             </div>
@@ -1482,6 +1555,7 @@ else if(st.showRoundSummary){
 else{
     /* Header */
     const header=(
+        <>
         <div className="px-4 py-2 flex items-center justify-between border-b" style={{background:'var(--card)',borderColor:'var(--border)'}}>
             <div className="flex items-center gap-4">
                 <button onClick={()=>{if(confirm('Ukončiť hru?')){TTS.stop();dp({type:'END_GAME'})}}}
@@ -1500,17 +1574,31 @@ else{
                 <span className="text-sm" style={{color:'var(--textSub)'}}>{DIFF_LABELS[st.diff]}</span>
             </div>
         </div>
+        <div className="px-4 py-1 flex items-center justify-center gap-3 text-xs border-b flex-wrap hide-mobile" style={{background:'rgba(0,0,0,.15)',borderColor:'var(--border)',color:'var(--textSub)'}}>
+            <span><span className="kbd">C</span> Správne</span>
+            <span><span className="kbd">N</span> Zle</span>
+            {isR1&&<span><span className="kbd">D</span> Ďalej</span>}
+            {!isR1&&<span><span className="kbd">S</span> Super</span>}
+            <span><span className="kbd">Space</span> Štart</span>
+            <span><span className="kbd">→</span> Ďalšia</span>
+            <span><span className="kbd">U</span> Undo</span>
+            <span><span className="kbd">R</span> Odkryť</span>
+            <span><span className="kbd">A</span> Odpoveď</span>
+        </div>
+        </>
     );
 
     /* Player Card */
     const playerCard=(num,name,score,isActive)=>{
     const isActiveAndR1=isR1&&isActive&&!st.answered;
     const isActiveR23=(isR2||isR3)&&isActive&&st.curQ&&!st.answered;
+    const av=num===1?st.p1?.avatar:st.p2?.avatar;
     return(
         <div className={`rounded-2xl p-4 border-2 transition-all duration-300 ${
             isActive?(num===1?'border-p1 bg-blue-500/10 shadow-lg shadow-blue-500/20':'border-p2 bg-red-500/10 shadow-lg shadow-red-500/20')
             :''}`} style={!isActive?{background:'var(--card)',borderColor:'var(--border)'}:{}}>
             <div className="flex items-center gap-2 mb-2">
+                {av&&<span className="text-2xl">{av}</span>}
                 <span className={`w-3 h-3 rounded-full ${num===1?'bg-p1':'bg-p2'} ${isActive?'animate-pulse':''}`}/>
                 <span className="font-bold">{name}</span>
                 {isActive&&<span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-lg font-bold">ODPOVEDÁ</span>}
@@ -1636,8 +1724,9 @@ else{
             </div>
             <p className="text-xl font-semibold mb-4 leading-relaxed">{st.curQ.question}</p>
             {st.curQ.img&&<div className="mb-4 flex justify-center"><img src={st.curQ.img} alt="" className="max-h-48 rounded-xl shadow-lg border border-white/10" style={{objectFit:'contain'}}/></div>}
-            <div className="rounded-xl p-3 mb-3" style={{background:'var(--card2)'}}>
-                <p className="text-ok font-bold text-xl">✓ {st.curQ.answer}</p>
+            <div className="rounded-xl p-3 mb-3 cursor-pointer select-none" style={{background:'var(--card2)'}} onClick={()=>setShowAnswer(v=>!v)} title="Klikni pre odkrytie/skrytie odpovede">
+                <p className={`text-ok font-bold text-xl transition-all ${showAnswer?'':'blur-sm'}`}>✓ {st.curQ.answer}</p>
+                {!showAnswer&&<p className="text-xs text-center mt-1" style={{color:'var(--textSub)'}}>👁️ Klikni alebo stlač <span className="kbd">A</span> pre odkrytie</p>}
             </div>
             {!st.revealed?(
                 <button onClick={()=>dp({type:'REVEAL'})} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-500 hover:to-indigo-500 py-3 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-all">📺 ODKRYŤ NA OBRAZOVKE</button>
@@ -1867,6 +1956,27 @@ const content=(
                 </tbody>
             </table>
         </Card>
+        {/* Post-game question review */}
+        {st.askedQuestions?.length>0&&(
+        <Card cls="mb-6 w-full">
+            <h3 className="text-lg font-bold text-accent mb-3 text-center">📝 Prehľad otázok ({st.askedQuestions.length})</h3>
+            <div className="max-h-80 overflow-y-auto space-y-2">
+                {st.askedQuestions.map((aq,i)=>(
+                    <div key={i} className="rounded-lg p-2 border text-sm" style={{background:'var(--card2)',borderColor:'var(--border)'}}>
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className={aq.ok?'text-green-400':'text-red-400'}>{aq.ok?'✓':'✗'}</span>
+                            <span className={aq.who===1?'text-p1':'text-p2'}>{aq.who===1?st.p1?.name:st.p2?.name}</span>
+                            <span style={{color:'var(--textSub)'}}>R{aq.round}</span>
+                            <span style={{color:'var(--textSub)'}}>{CAT_LABELS[aq.cat]||aq.cat}</span>
+                            <span className="ml-auto text-accent font-bold">{aq.pts}b</span>
+                        </div>
+                        <p>{aq.q}</p>
+                        <p className="text-ok font-semibold mt-0.5">→ {aq.a}</p>
+                    </div>
+                ))}
+            </div>
+        </Card>
+        )}
         <div className="flex gap-3 flex-wrap justify-center">
             {!saved?<Btn cls="bg-ok text-white hover:bg-green-600 py-3 px-6 shadow-lg shadow-green-500/20" onClick={doSave}>💾 Uložiť do tabuľky víťazov</Btn>
                 :<span className="text-ok font-bold py-3 px-6">✓ Uložené!</span>}
@@ -1892,10 +2002,30 @@ return <div className="min-h-screen flex items-center justify-center overflow-y-
 function LeaderboardScreen(){
 const{st,dp}=use$();
 const[filterDiff,setFilter]=useState('all');
+const[view,setView]=useState('simple'); /* simple | detailed */
 const filtered=filterDiff==='all'?st.history:st.history.filter(h=>h.diff===filterDiff);
 const wins={};
 filtered.forEach(h=>{wins[h.winner]=(wins[h.winner]||0)+1});
 const sorted=Object.entries(wins).sort((a,b)=>b[1]-a[1]);
+/* Enhanced per-player stats */
+const pStats=useMemo(()=>{
+    const ps={};
+    filtered.forEach(h=>{
+        const proc=(p,isP1)=>{
+            if(!p?.name)return;
+            if(!ps[p.name])ps[p.name]={games:0,wins:0,pts:0,correct:0,wrong:0};
+            const s=ps[p.name];s.games++;
+            if(h.winner===p.name)s.wins++;
+            s.pts+=isP1?h.s1:h.s2;
+            if(h.stats){['r1','r2','r3'].forEach(rk=>{
+                s.correct+=(h.stats[rk]?.[isP1?'p1c':'p2c'])||0;
+                s.wrong+=(h.stats[rk]?.[isP1?'p1w':'p2w'])||0;
+            })}
+        };
+        proc(h.p1,true);proc(h.p2,false);
+    });
+    return Object.entries(ps).sort((a,b)=>b[1].wins-a[1].wins||b[1].pts-a[1].pts);
+},[filtered]);
 const exportXLS=()=>{
     const data=sorted.map(([name,count],i)=>({'Poradie':i+1,'Hráč':name,'Víťazstvá':count}));
     const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();
@@ -1917,7 +2047,45 @@ return(
                 style={filterDiff!==k?{background:'var(--card2)'}:{}}>{v}</button>
         ))}
     </div>
-    {sorted.length===0?<p style={{color:'var(--textSub)'}} className="text-center py-8">Žiadne výsledky.</p>:
+    <div className="flex gap-2 mb-4">
+        <button onClick={()=>setView('simple')} className={`px-3 py-1 rounded-xl text-sm font-semibold ${view==='simple'?'bg-accent text-black':''}`}
+            style={view!=='simple'?{background:'var(--card2)'}:{}}>Jednoduchý</button>
+        <button onClick={()=>setView('detailed')} className={`px-3 py-1 rounded-xl text-sm font-semibold ${view==='detailed'?'bg-accent text-black':''}`}
+            style={view!=='detailed'?{background:'var(--card2)'}:{}}>Podrobný</button>
+    </div>
+    {view==='detailed'&&pStats.length>0?(
+    <Card cls="overflow-x-auto">
+        <table className="w-full text-sm">
+            <thead>
+                <tr style={{color:'var(--textSub)'}} className="text-xs uppercase">
+                    <th className="text-left py-2 px-2">#</th>
+                    <th className="text-left py-2 px-2">Hráč</th>
+                    <th className="py-2 px-2 text-center">Hry</th>
+                    <th className="py-2 px-2 text-center">🏆</th>
+                    <th className="py-2 px-2 text-center">Win%</th>
+                    <th className="py-2 px-2 text-center">Priemer</th>
+                    <th className="py-2 px-2 text-center">✓</th>
+                    <th className="py-2 px-2 text-center">✗</th>
+                </tr>
+            </thead>
+            <tbody>
+                {pStats.map(([name,s],i)=>(
+                    <tr key={name} className="border-t" style={{borderColor:'var(--border)'}}>
+                        <td className="py-2 px-2 font-black" style={{color:i===0?'#eab308':i===1?'#94a3b8':i===2?'#f97316':'var(--textSub)'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.'}</td>
+                        <td className="py-2 px-2 font-semibold">{name}</td>
+                        <td className="py-2 px-2 text-center" style={{color:'var(--textSub)'}}>{s.games}</td>
+                        <td className="py-2 px-2 text-center text-accent font-bold">{s.wins}</td>
+                        <td className="py-2 px-2 text-center font-bold" style={{color:s.games?(s.wins/s.games>=0.6?'#22c55e':s.wins/s.games>=0.4?'#eab308':'#ef4444'):'var(--textSub)'}}>{s.games?Math.round(s.wins/s.games*100):0}%</td>
+                        <td className="py-2 px-2 text-center" style={{color:'var(--textSub)'}}>{s.games?Math.round(s.pts/s.games):0}</td>
+                        <td className="py-2 px-2 text-center text-green-400 font-bold">{s.correct}</td>
+                        <td className="py-2 px-2 text-center text-red-400 font-bold">{s.wrong}</td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    </Card>
+    ):
+    sorted.length===0?<p style={{color:'var(--textSub)'}} className="text-center py-8">Žiadne výsledky.</p>:
     <div className="space-y-2">{sorted.map(([name,count],i)=>(
         <div key={name} className="rounded-xl p-4 flex items-center justify-between border" style={{background:'var(--card)',borderColor:'var(--border)'}}>
             <div className="flex items-center gap-3">
@@ -2374,6 +2542,7 @@ return(
 /* ════════════ APP ════════════ */
 function App(){
 const{st}=use$();
+const content=(()=>{
 switch(st.screen){
     case 'home':return <HomeScreen/>;
     case 'players':return <PlayersScreen/>;
@@ -2386,6 +2555,8 @@ switch(st.screen){
     case 'qeditor':return <QuestionEditorScreen/>;
     default:return <HomeScreen/>;
 }
+})();
+return <div key={st.screen} className="screen-enter">{content}</div>;
 }
 /* ═══════════════ LOGIN SCREEN ═══════════════ */
 function LoginScreen({onLogin}){
@@ -2421,7 +2592,7 @@ const[auth,setAuth]=useState(()=>sessionStorage.getItem('quiz_auth')==='1');
 if(!auth)return <LoginScreen onLogin={()=>setAuth(true)}/>;
 return <Provider><App/></Provider>;
 }
-ReactDOM.createRoot(document.getElementById('root')).render(<Root/>);
+ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><Root/></ErrorBoundary>);
 </script>
 <script>
 /* ── Force SW update on load ── */

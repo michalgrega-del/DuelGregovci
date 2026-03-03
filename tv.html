@@ -145,6 +145,8 @@ kulinarka:'from-stone-500/20 to-stone-600/5 border-stone-500/50',
 };
 const R1_TIME=90;
 const R3_Q_PER_CAT=2;
+/* Dynamic R1 total from moderator data (fallback to R1_TIME) */
+const _r1t=(d)=>(d&&d.r1Total)||R1_TIME;
 
 /* ─── Helpers ─── */
 function goFullscreen(){
@@ -157,18 +159,19 @@ if(t==='light')document.body.classList.add('light');
 else document.body.classList.remove('light');
 }
 function spawnConfetti(){
-const colors=['#eab308','#3b82f6','#ef4444','#22c55e','#a855f7','#f97316','#ec4899','#06b6d4'];
-for(let i=0;i<80;i++){
+const colors=['#eab308','#3b82f6','#ef4444','#22c55e','#a855f7','#f97316','#ec4899','#06b6d4','#fbbf24','#10b981'];
+for(let i=0;i<120;i++){
     const el=document.createElement('div');el.className='confetti';
     el.style.left=Math.random()*100+'vw';
     el.style.background=colors[i%colors.length];
-    el.style.width=Math.random()*10+6+'px';
-    el.style.height=Math.random()*10+6+'px';
+    el.style.width=Math.random()*12+5+'px';
+    el.style.height=Math.random()*12+5+'px';
     el.style.animationDuration=Math.random()*3+2+'s';
-    el.style.animationDelay=Math.random()*2+'s';
-    el.style.borderRadius=Math.random()>.5?'50%':'2px';
+    el.style.animationDelay=Math.random()*3+'s';
+    el.style.borderRadius=Math.random()>.5?'50%':Math.random()>.5?'2px':'0';
+    el.style.opacity=0.7+Math.random()*0.3;
     document.body.appendChild(el);
-    setTimeout(()=>el.remove(),6000);
+    setTimeout(()=>el.remove(),7000);
 }
 }
 
@@ -260,7 +263,7 @@ return(
                 <div className="w-32 h-32 rounded-full border-4 border-blue-500 flex items-center justify-center bg-blue-500/10 mb-3 mx-auto">
                     <span className="text-7xl font-black text-blue-400">{d.s1}</span>
                 </div>
-                <div className="text-lg text-blue-400 font-bold">{d.p1?.name}</div>
+                <div className="text-lg text-blue-400 font-bold">{d.p1?.avatar&&<span className="mr-1">{d.p1.avatar}</span>}{d.p1?.name}</div>
                 {d.stats&&(
                     <div className="text-sm mt-1">
                         <span className="text-green-400 font-bold">{d.stats[d.summaryRound===1?'r1':d.summaryRound===2?'r2':'r3']?.p1c || 0}✓</span>
@@ -274,7 +277,7 @@ return(
                 <div className="w-32 h-32 rounded-full border-4 border-red-500 flex items-center justify-center bg-red-500/10 mb-3 mx-auto">
                     <span className="text-7xl font-black text-red-400">{d.s2}</span>
                 </div>
-                <div className="text-lg text-red-400 font-bold">{d.p2?.name}</div>
+                <div className="text-lg text-red-400 font-bold">{d.p2?.avatar&&<span className="mr-1">{d.p2.avatar}</span>}{d.p2?.name}</div>
                 {d.stats&&(
                     <div className="text-sm mt-1">
                         <span className="text-green-400 font-bold">{d.stats[d.summaryRound===1?'r1':d.summaryRound===2?'r2':'r3']?.p2c || 0}✓</span>
@@ -453,14 +456,14 @@ return(
                 <div className={`w-36 h-36 rounded-full border-4 ${d.winner===1?'border-blue-400 bg-blue-500/20 anim-glow':'border-slate-700 bg-black/20'} flex items-center justify-center mb-2 mx-auto`}>
                     <span className="text-6xl font-black text-blue-400">{d.s1}</span>
                 </div>
-                <div className="text-lg text-blue-400 font-bold">{d.p1?.name}</div>
+                <div className="text-lg text-blue-400 font-bold">{d.p1?.avatar&&<span className="mr-1">{d.p1.avatar}</span>}{d.p1?.name}</div>
             </div>
             <div className="text-5xl font-bold text-slate-700">:</div>
             <div className="text-center">
                 <div className={`w-36 h-36 rounded-full border-4 ${d.winner===2?'border-red-400 bg-red-500/20 anim-glow':'border-slate-700 bg-black/20'} flex items-center justify-center mb-2 mx-auto`}>
                     <span className="text-6xl font-black text-red-400">{d.s2}</span>
                 </div>
-                <div className="text-lg text-red-400 font-bold">{d.p2?.name}</div>
+                <div className="text-lg text-red-400 font-bold">{d.p2?.avatar&&<span className="mr-1">{d.p2.avatar}</span>}{d.p2?.name}</div>
             </div>
         </div>
 
@@ -523,7 +526,8 @@ const dashOff=circ*(1-timerFrac);
 const tCol=d.tSec<=3?'#ef4444':d.tSec<=6?'#eab308':'#22c55e';
 
 /* R1 timer */
-const r1frac=(d.r1timer||0)/R1_TIME;
+const r1total=_r1t(d);
+const r1frac=(d.r1timer||0)/r1total;
 const r1circ=2*Math.PI*54;
 const r1dashOff=r1circ*(1-r1frac);
 const r1Col=(d.r1timer||0)<=10?'#ef4444':(d.r1timer||0)<=20?'#eab308':'#22c55e';
@@ -532,19 +536,23 @@ const [prevS1,setPrevS1]=useState(d.s1);
 const [prevS2,setPrevS2]=useState(d.s2);
 const [flashP1,setFlashP1]=useState(false);
 const [flashP2,setFlashP2]=useState(false);
+const [delta1,setDelta1]=useState(null);
+const [delta2,setDelta2]=useState(null);
 
-useEffect(()=>{if(d.s1!==prevS1){setFlashP1(true);setPrevS1(d.s1);setTimeout(()=>setFlashP1(false),500)}},[d.s1]);
-useEffect(()=>{if(d.s2!==prevS2){setFlashP2(true);setPrevS2(d.s2);setTimeout(()=>setFlashP2(false),500)}},[d.s2]);
+useEffect(()=>{if(d.s1!==prevS1){const dd=d.s1-prevS1;setDelta1(dd);setFlashP1(true);setPrevS1(d.s1);setTimeout(()=>{setFlashP1(false);setDelta1(null)},1200)}},[d.s1]);
+useEffect(()=>{if(d.s2!==prevS2){const dd=d.s2-prevS2;setDelta2(dd);setFlashP2(true);setPrevS2(d.s2);setTimeout(()=>{setFlashP2(false);setDelta2(null)},1200)}},[d.s2]);
 
 /* Player card */
-const PlayerCard=({num,name,score,isActive,flash})=>(
-<div className={`flex flex-col items-center justify-center w-48 rounded-2xl border-2 p-4 transition-all duration-300 ${
+const PlayerCard=({num,name,score,isActive,flash,avatar,scoreDelta})=>(
+<div className={`flex flex-col items-center justify-center w-48 rounded-2xl border-2 p-4 transition-all duration-300 relative ${
     isActive?(num===1?'border-blue-500 bg-blue-950/60 shadow-lg shadow-blue-500/30':'border-red-500 bg-red-950/60 shadow-lg shadow-red-500/30')
     :'border-slate-800 bg-black/20'}`}>
     {isActive&&<span className={`text-xs font-bold uppercase tracking-widest mb-2 ${num===1?'text-blue-400':'text-red-400'} animate-pulse`}>● ODPOVEDÁ</span>}
     {d.passing&&isActive&&<span className="text-xs font-bold text-yellow-400 uppercase tracking-widest mb-1 anim-super">⚡ SUPER</span>}
+    {avatar&&<span className="text-3xl mb-1">{avatar}</span>}
     <h3 className={`text-lg font-bold mb-2 ${isActive?'text-white':'text-slate-400'}`}>{name}</h3>
     <div className={`text-6xl font-black ${flash?'anim-score':''} ${score<0?'text-red-400':num===1?'text-blue-400':'text-red-400'}`}>{score}</div>
+    {scoreDelta!==null&&scoreDelta!==0&&<span className={`float-score text-2xl ${scoreDelta>0?'text-green-400':'text-red-400'}`}>{scoreDelta>0?'+':''}{scoreDelta}</span>}
 </div>
 );
 
@@ -566,7 +574,7 @@ return(
     {isR1&&d.r1tRun&&(
         <div className="px-6 py-1 bg-black/20">
             <div className="h-3 rounded-full overflow-hidden bg-slate-800">
-                <div className="h-full rounded-full timeline-bar" style={{width:((d.r1timer/R1_TIME)*100)+'%',background:r1Col}}/>
+                <div className="h-full rounded-full timeline-bar" style={{width:((d.r1timer/_r1t(d))*100)+'%',background:r1Col}}/>
             </div>
         </div>
     )}
@@ -574,7 +582,7 @@ return(
     {/* Main area */}
     <div className="flex-1 flex items-center justify-between px-6 gap-4" style={{minHeight:0}}>
         {/* P1 */}
-        <PlayerCard num={1} name={d.p1?.name} score={d.s1} isActive={d.active===1} flash={flashP1}/>
+        <PlayerCard num={1} name={d.p1?.name} score={d.s1} isActive={d.active===1} flash={flashP1} avatar={d.p1?.avatar} scoreDelta={delta1}/>
 
         {/* Center */}
         <div className="flex-1 flex flex-col items-center justify-center max-w-4xl gap-4 overflow-y-auto py-2" style={{minHeight:0}}>
@@ -646,7 +654,7 @@ return(
         </div>
 
         {/* P2 */}
-        <PlayerCard num={2} name={d.p2?.name} score={d.s2} isActive={d.active===2} flash={flashP2}/>
+        <PlayerCard num={2} name={d.p2?.name} score={d.s2} isActive={d.active===2} flash={flashP2} avatar={d.p2?.avatar} scoreDelta={delta2}/>
     </div>
 
     {/* Bottom bar */}
@@ -688,6 +696,7 @@ function TVApp(){
 const[data,setData]=useState(null);
 const[waiting,setWaiting]=useState(true);
 const[source,setSource]=useState('…');
+const[connected,setConnected]=useState(true);
 
 useEffect(()=>{
     /* 1) Local same-device sync via BroadcastChannel */
@@ -700,13 +709,14 @@ useEffect(()=>{
 
     /* 2) Cloud cross-device sync via Firestore */
     const unsub=db.collection('quiz_data').doc('game_state').onSnapshot(snap=>{
+        setConnected(true);
         if(!snap.exists)return;
         const msg=snap.data();
         if(!msg||!msg.type)return;
         console.log('[TV Cloud] Received:',msg.type);
         if(msg.type==='WAITING'){setWaiting(true);setData(null);setSource('cloud')}
         else if(msg.type==='UPDATE'&&msg.data){setWaiting(false);setData(msg.data);setSource('cloud');if(msg.data.theme)applyTheme(msg.data.theme)}
-    },e=>console.warn('[TV Cloud] Listen error:',e));
+    },e=>{console.warn('[TV Cloud] Listen error:',e);setConnected(false)});
 
     return()=>{ch.close();unsub();};
 },[]);
@@ -726,8 +736,9 @@ else{
 
 return(
 <div onClick={handleClick} className="w-full h-full">
-    {content}
+    <div key={data?.round||'wait'} className="w-full h-full screen-enter">{content}</div>
     {data&&data.feedback&&<FeedbackOverlay type={data.feedback} answer={data.answer}/>}
+    {!connected&&<div className="fixed bottom-4 right-4 z-50 bg-red-500/90 text-white px-4 py-2 rounded-xl font-bold text-sm animate-pulse shadow-lg">⚠️ Spojenie prerusené</div>}
 </div>
 );
 }
@@ -760,13 +771,29 @@ return(
 </div>
 );}
 
+/* ═══════════════ ERROR BOUNDARY ═══════════════ */
+class ErrorBoundary extends React.Component{
+constructor(p){super(p);this.state={err:null}}
+static getDerivedStateFromError(e){return{err:e}}
+render(){
+if(this.state.err)return(
+<div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
+<div className="text-center p-8 bg-slate-800 rounded-2xl max-w-md shadow-2xl">
+<div className="text-6xl mb-4">⚠️</div>
+<h2 className="text-2xl font-bold mb-2">Chyba TV</h2>
+<p className="text-slate-400 mb-4 text-sm break-all">{this.state.err.message}</p>
+<button onClick={()=>location.reload()} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold text-lg">🔄 Reštart</button>
+</div></div>);
+return this.props.children;
+}}
+
 /* ═══════════════ ROOT WITH AUTH GATE ═══════════════ */
 function TVRoot(){
 const[auth,setAuth]=useState(()=>sessionStorage.getItem('quiz_auth')==='1');
 if(!auth)return <LoginScreen onLogin={()=>setAuth(true)}/>;
 return <TVApp/>;
 }
-ReactDOM.createRoot(document.getElementById('root')).render(<TVRoot/>);
+ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><TVRoot/></ErrorBoundary>);
 </script>
 <script>
 if('serviceWorker' in navigator){
