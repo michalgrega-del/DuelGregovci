@@ -1634,8 +1634,9 @@ else{
     );
 
     /* Timer display */
+    const TIMER=st.settings?.timer||R2_TIMER_DEFAULT;
     const timerColor=st.tSec<=3?'text-red-400':st.tSec<=6?'text-yellow-400':'text-accent';
-    const timerDisplay=(isR2||isR3)&&!isTB&&st.curQ&&(st.tRun||st.tSec<R2_TIMER||st.answered)&&(
+    const timerDisplay=(isR2||isR3)&&!isTB&&st.curQ&&(st.tRun||st.tSec<TIMER||st.answered)&&(
         <div className="mt-3 flex items-center gap-3">
             <span className="text-sm" style={{color:'var(--textSub)'}}>Čas:</span>
             <span className={`text-4xl font-black w-14 text-center ${timerColor}`}>{st.tSec}</span>
