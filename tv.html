@@ -260,8 +260,8 @@ return(
         <h3 className="text-4xl font-black text-accent mb-8">{ROUND_NAMES[d.summaryRound]}</h3>
         <div className="flex items-center justify-center gap-16 mb-8">
             <div className="text-center">
-                <div className="w-32 h-32 rounded-full border-4 border-blue-500 flex items-center justify-center bg-blue-500/10 mb-3 mx-auto">
-                    <span className="text-7xl font-black text-blue-400">{d.s1}</span>
+                <div className="w-36 h-36 rounded-full border-4 border-blue-500 flex items-center justify-center bg-blue-500/10 mb-3 mx-auto overflow-hidden">
+                    <span className="text-5xl font-black text-blue-400 leading-none">{d.s1}</span>
                 </div>
                 <div className="text-lg text-blue-400 font-bold">{d.p1?.avatar&&<span className="mr-1">{d.p1.avatar}</span>}{d.p1?.name}</div>
                 {d.stats&&(
@@ -274,8 +274,8 @@ return(
             </div>
             <div className="text-5xl font-bold text-slate-700">:</div>
             <div className="text-center">
-                <div className="w-32 h-32 rounded-full border-4 border-red-500 flex items-center justify-center bg-red-500/10 mb-3 mx-auto">
-                    <span className="text-7xl font-black text-red-400">{d.s2}</span>
+                <div className="w-36 h-36 rounded-full border-4 border-red-500 flex items-center justify-center bg-red-500/10 mb-3 mx-auto overflow-hidden">
+                    <span className="text-5xl font-black text-red-400 leading-none">{d.s2}</span>
                 </div>
                 <div className="text-lg text-red-400 font-bold">{d.p2?.avatar&&<span className="mr-1">{d.p2.avatar}</span>}{d.p2?.name}</div>
                 {d.stats&&(
@@ -453,15 +453,15 @@ return(
 
         <div className="flex items-center justify-center gap-16 mb-8">
             <div className="text-center">
-                <div className={`w-36 h-36 rounded-full border-4 ${d.winner===1?'border-blue-400 bg-blue-500/20 anim-glow':'border-slate-700 bg-black/20'} flex items-center justify-center mb-2 mx-auto`}>
-                    <span className="text-6xl font-black text-blue-400">{d.s1}</span>
+                <div className={`w-40 h-40 rounded-full border-4 ${d.winner===1?'border-blue-400 bg-blue-500/20 anim-glow':'border-slate-700 bg-black/20'} flex items-center justify-center mb-2 mx-auto overflow-hidden`}>
+                    <span className="text-5xl font-black text-blue-400 leading-none">{d.s1}</span>
                 </div>
                 <div className="text-lg text-blue-400 font-bold">{d.p1?.avatar&&<span className="mr-1">{d.p1.avatar}</span>}{d.p1?.name}</div>
             </div>
             <div className="text-5xl font-bold text-slate-700">:</div>
             <div className="text-center">
-                <div className={`w-36 h-36 rounded-full border-4 ${d.winner===2?'border-red-400 bg-red-500/20 anim-glow':'border-slate-700 bg-black/20'} flex items-center justify-center mb-2 mx-auto`}>
-                    <span className="text-6xl font-black text-red-400">{d.s2}</span>
+                <div className={`w-40 h-40 rounded-full border-4 ${d.winner===2?'border-red-400 bg-red-500/20 anim-glow':'border-slate-700 bg-black/20'} flex items-center justify-center mb-2 mx-auto overflow-hidden`}>
+                    <span className="text-5xl font-black text-red-400 leading-none">{d.s2}</span>
                 </div>
                 <div className="text-lg text-red-400 font-bold">{d.p2?.avatar&&<span className="mr-1">{d.p2.avatar}</span>}{d.p2?.name}</div>
             </div>
