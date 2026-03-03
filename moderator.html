@@ -318,9 +318,19 @@ return{get enabled(){return _on},set enabled(v){_on=!!v;if(!v)stop()},speak,afte
 /* ─── SHUFFLE QUESTIONS at load ─── */
 for(let i=QUESTIONS_DB.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[QUESTIONS_DB[i],QUESTIONS_DB[j]]=[QUESTIONS_DB[j],QUESTIONS_DB[i]]}
 
-/* ─── BROADCAST ─── */
+/* ─── BROADCAST (local + cloud) ─── */
 const tvCh=new BroadcastChannel('duel-game');
-const sendTV=(type,data)=>tvCh.postMessage({type,data});
+let _tvThrottle=null;
+const sendTV=(type,data)=>{
+    /* Local same-device sync (instant) */
+    tvCh.postMessage({type,data});
+    /* Cloud cross-device sync (throttled to avoid Firestore quota) */
+    if(_tvThrottle)clearTimeout(_tvThrottle);
+    _tvThrottle=setTimeout(()=>{
+        db.collection('quiz_data').doc('game_state').set({type,data:data||{},ts:firebase.firestore.FieldValue.serverTimestamp()})
+          .catch(e=>console.warn('[Cloud TV] Write failed:',e));
+    },80);
+};
 
 /* ─── QUESTION HELPERS ─── */
 function getRecentUsedIds(){

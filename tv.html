@@ -168,7 +168,7 @@ for(let i=0;i<80;i++){
 }
 
 /* ═══════════════ WAITING SCREEN ═══════════════ */
-function WaitingScreen(){
+function WaitingScreen({source}){
 return(
 <div className="w-full h-full flex flex-col items-center justify-center standard-bg">
     <div className="anim-float">
@@ -176,6 +176,10 @@ return(
     </div>
     <p className="text-slate-500 text-xl">Rodinná vedomostná súťaž</p>
     <p className="text-slate-600 text-sm mt-4">Čaká sa na spustenie hry…</p>
+    <div className="flex items-center gap-2 mt-6">
+        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+        <span className="text-slate-700 text-xs">Cloud TV pripravené · {source||'…'}</span>
+    </div>
 </div>
 );
 }
@@ -601,25 +605,51 @@ return(
 );
 }
 
+/* ─── FIREBASE (cross-device TV sync) ─── */
+const firebaseConfig={
+  apiKey:"AIzaSyDxGUT8PB1rxNsfVsDxdAZmdKMlWBwdJrw",
+  authDomain:"vedomostna-hra-2026.firebaseapp.com",
+  projectId:"vedomostna-hra-2026",
+  storageBucket:"vedomostna-hra-2026.firebasestorage.app",
+  messagingSenderId:"460121621924",
+  appId:"1:460121621924:web:5b1699df44371bb3ec2d31"
+};
+if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+console.log('[TV] Firebase connected, project:',firebaseConfig.projectId);
+
 /* ═══════════════ TV APP ═══════════════ */
 function TVApp(){
 const[data,setData]=useState(null);
 const[waiting,setWaiting]=useState(true);
+const[source,setSource]=useState('…');
 
 useEffect(()=>{
+    /* 1) Local same-device sync via BroadcastChannel */
     const ch=new BroadcastChannel('duel-game');
     ch.onmessage=e=>{
         const{type,data:d}=e.data;
-        if(type==='WAITING'){setWaiting(true);setData(null)}
-        else if(type==='UPDATE'){setWaiting(false);setData(d);if(d.theme)applyTheme(d.theme)}
+        if(type==='WAITING'){setWaiting(true);setData(null);setSource('local')}
+        else if(type==='UPDATE'){setWaiting(false);setData(d);setSource('local');if(d.theme)applyTheme(d.theme)}
     };
-    return()=>ch.close();
+
+    /* 2) Cloud cross-device sync via Firestore */
+    const unsub=db.collection('quiz_data').doc('game_state').onSnapshot(snap=>{
+        if(!snap.exists)return;
+        const msg=snap.data();
+        if(!msg||!msg.type)return;
+        console.log('[TV Cloud] Received:',msg.type);
+        if(msg.type==='WAITING'){setWaiting(true);setData(null);setSource('cloud')}
+        else if(msg.type==='UPDATE'&&msg.data){setWaiting(false);setData(msg.data);setSource('cloud');if(msg.data.theme)applyTheme(msg.data.theme)}
+    },e=>console.warn('[TV Cloud] Listen error:',e));
+
+    return()=>{ch.close();unsub();};
 },[]);
 
 const handleClick=()=>goFullscreen();
 
 let content;
-if(waiting||!data) content=<WaitingScreen/>;
+if(waiting||!data) content=<WaitingScreen source={source}/>;
 else{
     const d=data;
     if(d.showRoundSummary) content=<RoundSummaryScreen d={d}/>;
