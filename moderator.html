@@ -2279,7 +2279,10 @@ const[editorTab,setEditorTab]=useState('questions'); /* questions | groups */
 const[groups,setGroupsState]=useState(()=>loadGroups());
 const setGroups=(g)=>{saveGroups(g);setGroupsState(g)};
 const[grpModal,setGrpModal]=useState(null); /* null | {id?,name} */
-const[catModal,setCatModal]=useState(null); /* null | {groupId,key?,label,icon} */const[page,setPage]=useState(0);
+const[catModal,setCatModal]=useState(null); /* null | {groupId,key?,label,icon} */
+const groupFileRef=useRef(null);
+const importTargetRef=useRef(null);
+const[page,setPage]=useState(0);
 const[showModal,setShowModal]=useState(false);
 const[editQ,setEditQ]=useState(null);
 const[toast,setToast]=useState('');
@@ -2363,6 +2366,51 @@ const resetToOriginal=()=>{
   flash('♻️ Obnovené – načítajte stránku znova (Ctrl+R)');
 };
 
+/* Download template Excel for group import */
+const downloadTemplate=()=>{
+  const data=[
+    {otazka:'Aké je hlavné mesto Slovenska?',odpoved:'Bratislava',obtaznost:'level1',typ:'normal',obrazok:''},
+    {otazka:'Koľko obyvateľov má Košice?',odpoved:'Približne 240 000',obtaznost:'level2',typ:'normal',obrazok:''},
+  ];
+  const ws=XLSX.utils.json_to_sheet(data);
+  ws['!cols']=[{wch:50},{wch:30},{wch:12},{wch:10},{wch:40}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Šablóna');
+  XLSX.writeFile(wb,'DUEL_Sablona_Import.xlsx');
+};
+
+/* Import Excel into specific group + theme */
+const handleGroupImport=(e)=>{
+  const file=e.target.files[0];if(!file)return;
+  const target=importTargetRef.current;if(!target)return;
+  const reader=new FileReader();
+  reader.onload=(evt)=>{
+    try{
+      const wb=XLSX.read(evt.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const data=XLSX.utils.sheet_to_json(ws);
+      let base=nextId();
+      const imp=data.map((r,i)=>({
+        id:base+i,
+        question:r.question||r.otazka||r['otázka']||r.Question||'',
+        answer:r.answer||r.odpoved||r['odpoveď']||r.Answer||'',
+        category:target.catKey,
+        difficulty:r.difficulty||r.obtaznost||r['obtiažnosť']||r.Difficulty||'level1',
+        scope:'group',
+        type:r.type||r.typ||r.Type||'normal',
+        group:target.groupId,
+        ...(r.img||r.obrazok||r['obrázok']?{img:r.img||r.obrazok||r['obrázok']}:{}),
+      })).filter(q=>q.question&&q.answer);
+      const grp=groups.find(g=>g.id===target.groupId);
+      const cat=grp?.cats.find(c=>c.key===target.catKey);
+      if(imp.length){persist([...questions,...imp]);flash(`✅ Importovaných ${imp.length} otázok → ${grp?.name||''} / ${cat?.label||''}`)}
+      else flash('⚠️ Žiadne platné otázky v súbore');
+    }catch(err){flash('❌ Chyba: '+err.message)}
+  };
+  reader.readAsArrayBuffer(file);e.target.value='';
+  importTargetRef.current=null;
+};
+
 const stats=useMemo(()=>({
   total:questions.length,
   sk:questions.filter(q=>q.scope==='sk').length,
@@ -2410,10 +2458,14 @@ return(
 
   {/* ═══ GROUPS TAB ═══ */}
   {editorTab==='groups'&&(<div>
-    <div className="flex items-center justify-between mb-4">
+    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
       <p style={{color:'var(--textSub)'}} className="text-sm">Vytvor si vlastné skupiny s témami a otázkami. Pri nastavení hry zvoľ „📦 Skupina".</p>
-      <Btn cls="bg-purple-600 text-white text-sm hover:bg-purple-500" onClick={()=>setGrpModal({name:''})}>➕ Nová skupina</Btn>
+      <div className="flex gap-2">
+        <Btn cls="bg-blue-600 text-white text-sm hover:bg-blue-500" onClick={downloadTemplate}>📄 Šablóna Excel</Btn>
+        <Btn cls="bg-purple-600 text-white text-sm hover:bg-purple-500" onClick={()=>setGrpModal({name:''})}>➕ Nová skupina</Btn>
+      </div>
     </div>
+    <input ref={groupFileRef} type="file" accept=".csv,.xlsx,.xls" onChange={handleGroupImport} className="hidden"/>
     {groups.length===0&&<Card><p className="text-center py-8" style={{color:'var(--textSub)'}}>Žiadne skupiny. Vytvor prvú!</p></Card>}
     {groups.map(g=>{
       const gqs=questions.filter(q=>q.group===g.id);
@@ -2449,6 +2501,8 @@ return(
               <div className="flex gap-1">
                 <button onClick={()=>{setEditQ({group:g.id,category:c.key,scope:'group',difficulty:'level1',type:'normal'});setShowModal(true)}}
                   className="text-green-400 hover:text-green-300 text-xs" title="Pridať otázku">➕</button>
+                <button onClick={()=>{importTargetRef.current={groupId:g.id,catKey:c.key};groupFileRef.current?.click()}}
+                  className="text-cyan-400 hover:text-cyan-300 text-xs" title="Import z Excelu">📥</button>
                 <button onClick={()=>setCatModal({groupId:g.id,key:c.key,label:c.label,icon:c.icon})}
                   className="text-blue-400 hover:text-blue-300 text-xs" title="Upraviť tému">✏️</button>
                 <button onClick={()=>{if(!confirm('Odstrániť tému „'+c.label+'" a jej otázky?'))return;
