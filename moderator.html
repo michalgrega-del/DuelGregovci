@@ -60,6 +60,16 @@ accent:'#eab308',p1:'#3b82f6',p2:'#ef4444',ok:'#22c55e',err:'#ef4444',
 <script>
 /* Safety: ensure QUESTIONS_DB is on window for Babel standalone access */
 if(typeof QUESTIONS_DB!=='undefined'&&!window.QUESTIONS_DB)window.QUESTIONS_DB=QUESTIONS_DB;
+/* Check for editor-saved questions in localStorage */
+try{
+  var _savedQ=localStorage.getItem('duel_questions_db');
+  if(_savedQ){var _parsed=JSON.parse(_savedQ);
+    if(Array.isArray(_parsed)&&_parsed.length>0){
+      window.QUESTIONS_DB=_parsed;
+      console.log('[QUIZ] Using editor-saved questions:',_parsed.length);
+    }
+  }
+}catch(e){console.warn('[QUIZ] Error loading saved questions:',e)}
 console.log('[QUIZ] QUESTIONS_DB check:', !!window.QUESTIONS_DB, window.QUESTIONS_DB?window.QUESTIONS_DB.length:0);
 if(!window.QUESTIONS_DB||!window.QUESTIONS_DB.length){
   console.error('[QUIZ] QUESTIONS_DB not loaded! typeof=',typeof QUESTIONS_DB);
@@ -911,8 +921,9 @@ return(
         <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'leaderboard'})}>🏆 Rebríček</Btn>
         <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'hist'})}>📋 História</Btn>
         <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'settings'})}>⚙️ Nastavenia</Btn>
+        <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'qeditor'})}>✏️ Editor otázok</Btn>
     </div>
-    <p className="text-xs mt-4" style={{color:'var(--border)'}}>v2.2-save</p>
+    <p className="text-xs mt-4" style={{color:'var(--border)'}}>v2.3-editor</p>
 </div>
 );
 }
@@ -2030,6 +2041,336 @@ return(
 );
 }
 
+/* ════════════ QUESTION EDITOR ════════════ */
+function QuestionEditorScreen(){
+const{st,dp}=use$();
+const fileRef=useRef(null);
+const[questions,setQuestions]=useState(()=>[...QUESTIONS_DB]);
+const[search,setSearch]=useState('');
+const[fCat,setFCat]=useState('');
+const[fDiff,setFDiff]=useState('');
+const[fScope,setFScope]=useState('');
+const[fType,setFType]=useState('');
+const[fImg,setFImg]=useState('');
+const[page,setPage]=useState(0);
+const[showModal,setShowModal]=useState(false);
+const[editQ,setEditQ]=useState(null);
+const[toast,setToast]=useState('');
+const PG=30;
+
+const allCats=useMemo(()=>{const s=new Set(questions.map(q=>q.category));return[...s].sort()},[questions]);
+
+const filtered=useMemo(()=>questions.filter(q=>{
+  if(search){const s=search.toLowerCase();if(!q.question.toLowerCase().includes(s)&&!q.answer.toLowerCase().includes(s)&&!String(q.id).includes(s))return false}
+  if(fCat&&q.category!==fCat)return false;
+  if(fDiff&&q.difficulty!==fDiff)return false;
+  if(fScope&&q.scope!==fScope)return false;
+  if(fType&&q.type!==fType)return false;
+  if(fImg==='yes'&&!q.img)return false;
+  if(fImg==='no'&&q.img)return false;
+  return true;
+}),[questions,search,fCat,fDiff,fScope,fType,fImg]);
+
+const totalPg=Math.ceil(filtered.length/PG);
+const pageQ=filtered.slice(page*PG,(page+1)*PG);
+
+const flash=(msg)=>{setToast(msg);setTimeout(()=>setToast(''),3000)};
+
+/* Persist: mutate shared QUESTIONS_DB array in place + save to localStorage */
+const persist=(qs)=>{
+  QUESTIONS_DB.length=0;qs.forEach(q=>QUESTIONS_DB.push(q));
+  window.QUESTIONS_DB=QUESTIONS_DB;
+  try{localStorage.setItem('duel_questions_db',JSON.stringify(qs))}catch(e){console.warn(e)}
+  setQuestions([...qs]);
+};
+
+const nextId=()=>questions.reduce((m,q)=>Math.max(m,q.id),0)+1;
+
+const saveQ=(q)=>{
+  let qs;
+  if(editQ&&editQ.id){qs=questions.map(o=>o.id===editQ.id?{...q,id:editQ.id}:o)}
+  else{qs=[...questions,{...q,id:nextId()}]}
+  persist(qs);setShowModal(false);setEditQ(null);
+  flash(editQ&&editQ.id?'✅ Otázka upravená':'✅ Otázka pridaná');
+};
+
+const deleteQ=(id)=>{if(!confirm('Odstrániť otázku #'+id+'?'))return;persist(questions.filter(q=>q.id!==id));flash('🗑️ Otázka odstránená')};
+
+const handleImport=(e)=>{
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=(evt)=>{
+    try{
+      const wb=XLSX.read(evt.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const data=XLSX.utils.sheet_to_json(ws);
+      let base=nextId();
+      const imp=data.map((r,i)=>({
+        id:base+i,
+        question:r.question||r.otazka||r['otázka']||r.Question||'',
+        answer:r.answer||r.odpoved||r['odpoveď']||r.Answer||'',
+        category:r.category||r.kategoria||r['kategória']||r.Category||'zaujimavosti_sk',
+        difficulty:r.difficulty||r.obtaznost||r['obtiažnosť']||r.Difficulty||'level1',
+        scope:r.scope||r.rozsah||r.Scope||'sk',
+        type:r.type||r.typ||r.Type||'normal',
+        ...(r.img||r.obrazok||r['obrázok']?{img:r.img||r.obrazok||r['obrázok']}:{}),
+      })).filter(q=>q.question&&q.answer);
+      if(imp.length){persist([...questions,...imp]);flash(`✅ Importovaných ${imp.length} otázok`)}
+      else flash('⚠️ Žiadne platné otázky v súbore');
+    }catch(err){flash('❌ Chyba: '+err.message)}
+  };
+  reader.readAsArrayBuffer(file);e.target.value='';
+};
+
+const handleExport=()=>{
+  const data=filtered.map(q=>({id:q.id,question:q.question,answer:q.answer,category:q.category,category_label:CAT_LABELS[q.category]||q.category,difficulty:q.difficulty,scope:q.scope,type:q.type,img:q.img||''}));
+  const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Otázky');
+  XLSX.writeFile(wb,`DUEL_Otazky_${new Date().toISOString().slice(0,10)}.xlsx`);
+};
+
+const resetToOriginal=()=>{
+  if(!confirm('Obnoviť pôvodnú databázu otázok? Všetky zmeny budú stratené!'))return;
+  localStorage.removeItem('duel_questions_db');
+  flash('♻️ Obnovené – načítajte stránku znova (Ctrl+R)');
+};
+
+const stats=useMemo(()=>({
+  total:questions.length,
+  sk:questions.filter(q=>q.scope==='sk').length,
+  svet:questions.filter(q=>q.scope==='svet').length,
+  junior:questions.filter(q=>q.difficulty==='junior').length,
+  level1:questions.filter(q=>q.difficulty==='level1').length,
+  level2:questions.filter(q=>q.difficulty==='level2').length,
+  img:questions.filter(q=>q.img).length,
+  tb:questions.filter(q=>q.type==='tiebreaker').length,
+}),[questions]);
+
+/* Duplicate detection */
+const duplicates=useMemo(()=>{
+  const seen=new Map();const dupes=new Set();
+  questions.forEach(q=>{const k=q.question.toLowerCase().trim();if(seen.has(k)){dupes.add(q.id);dupes.add(seen.get(k))}else seen.set(k,q.id)});
+  return dupes;
+},[questions]);
+
+return(
+<div className="max-w-7xl mx-auto p-4">
+  {/* Toast */}
+  {toast&&<div className="fixed top-4 right-4 z-50 px-4 py-2 rounded-xl text-sm font-semibold shadow-lg animate-bounce" style={{background:'var(--card)',border:'1px solid var(--border)',color:'var(--text)'}}>{toast}</div>}
+
+  {/* Header */}
+  <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div className="flex items-center gap-3">
+      <button onClick={()=>dp({type:'NAV',to:'home'})} style={{color:'var(--textSub)'}} className="hover:text-accent transition-colors text-lg">← Späť</button>
+      <h2 className="text-2xl font-bold">✏️ Editor otázok</h2>
+      <span className="text-sm px-2 py-0.5 rounded-full bg-accent/20 text-accent font-mono">{questions.length}</span>
+    </div>
+    <div className="flex flex-wrap gap-2">
+      <Btn cls="bg-green-600 text-white text-sm hover:bg-green-500" onClick={()=>{setEditQ({});setShowModal(true)}}>➕ Nová</Btn>
+      <Btn cls="bg-blue-600 text-white text-sm hover:bg-blue-500" onClick={()=>fileRef.current?.click()}>📥 Import</Btn>
+      <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" onChange={handleImport} className="hidden"/>
+      <Btn cls="bg-purple-600 text-white text-sm hover:bg-purple-500" onClick={handleExport}>📤 Export ({filtered.length})</Btn>
+      <Btn cls="bg-red-600/30 text-red-400 text-sm border border-red-500/30 hover:bg-red-600/50" onClick={resetToOriginal}>♻️ Reset</Btn>
+    </div>
+  </div>
+
+  {/* Stats */}
+  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mb-4">
+    {[['Celkom',stats.total,'📊'],['🇸🇰 SK',stats.sk,''],['🌍 Svet',stats.svet,''],['Junior',stats.junior,'🟢'],['Level 1',stats.level1,'🟡'],['Level 2',stats.level2,'🔴'],['Obrázky',stats.img,'🖼️'],['Rozstrel',stats.tb,'⚡']].map(([l,v,ic])=>(
+      <div key={l} className="rounded-xl p-2 text-center border" style={{background:'var(--card)',borderColor:'var(--border)'}}>
+        <div className="text-lg font-bold">{ic} {v}</div>
+        <div className="text-xs" style={{color:'var(--textSub)'}}>{l}</div>
+      </div>
+    ))}
+  </div>
+
+  {/* Filters */}
+  <Card cls="mb-4">
+    <div className="flex flex-wrap gap-2 items-end">
+      <div className="flex-1 min-w-[200px]">
+        <label className="text-xs block mb-1" style={{color:'var(--textSub)'}}>🔍 Hľadať</label>
+        <input value={search} onChange={e=>{setSearch(e.target.value);setPage(0)}} placeholder="Text otázky, odpoveď alebo ID…"
+          className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-accent" style={{background:'var(--inputBg)',color:'var(--text)'}}/>
+      </div>
+      <div>
+        <label className="text-xs block mb-1" style={{color:'var(--textSub)'}}>Kategória</label>
+        <select value={fCat} onChange={e=>{setFCat(e.target.value);setPage(0)}} className="rounded-lg px-2 py-2 text-sm outline-none" style={{background:'var(--inputBg)',color:'var(--text)'}}>
+          <option value="">Všetky</option>
+          {allCats.map(c=><option key={c} value={c}>{CAT_ICONS[c]||''} {CAT_LABELS[c]||c}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="text-xs block mb-1" style={{color:'var(--textSub)'}}>Obtiažnosť</label>
+        <select value={fDiff} onChange={e=>{setFDiff(e.target.value);setPage(0)}} className="rounded-lg px-2 py-2 text-sm outline-none" style={{background:'var(--inputBg)',color:'var(--text)'}}>
+          <option value="">Všetky</option>
+          <option value="junior">Junior</option><option value="level1">Level 1</option><option value="level2">Level 2</option>
+        </select>
+      </div>
+      <div>
+        <label className="text-xs block mb-1" style={{color:'var(--textSub)'}}>Rozsah</label>
+        <select value={fScope} onChange={e=>{setFScope(e.target.value);setPage(0)}} className="rounded-lg px-2 py-2 text-sm outline-none" style={{background:'var(--inputBg)',color:'var(--text)'}}>
+          <option value="">Všetky</option><option value="sk">🇸🇰 Slovensko</option><option value="svet">🌍 Svet</option>
+        </select>
+      </div>
+      <div>
+        <label className="text-xs block mb-1" style={{color:'var(--textSub)'}}>Typ</label>
+        <select value={fType} onChange={e=>{setFType(e.target.value);setPage(0)}} className="rounded-lg px-2 py-2 text-sm outline-none" style={{background:'var(--inputBg)',color:'var(--text)'}}>
+          <option value="">Všetky</option><option value="normal">Normálna</option><option value="tiebreaker">Rozstrel</option>
+        </select>
+      </div>
+      <div>
+        <label className="text-xs block mb-1" style={{color:'var(--textSub)'}}>Obrázok</label>
+        <select value={fImg} onChange={e=>{setFImg(e.target.value);setPage(0)}} className="rounded-lg px-2 py-2 text-sm outline-none" style={{background:'var(--inputBg)',color:'var(--text)'}}>
+          <option value="">Všetky</option><option value="yes">S obrázkom</option><option value="no">Bez obrázka</option>
+        </select>
+      </div>
+      {(search||fCat||fDiff||fScope||fType||fImg)&&<Btn cls="text-xs text-red-400 hover:text-red-300" onClick={()=>{setSearch('');setFCat('');setFDiff('');setFScope('');setFType('');setFImg('');setPage(0)}}>✕ Zrušiť filtre</Btn>}
+    </div>
+    <div className="mt-2 text-xs" style={{color:'var(--textSub)'}}>Zobrazených: <b>{filtered.length}</b> z {questions.length}{duplicates.size>0&&<span className="text-yellow-400 ml-2">⚠️ {duplicates.size} potenciálnych duplikátov</span>}</div>
+  </Card>
+
+  {/* Questions table */}
+  <div className="rounded-2xl border overflow-hidden" style={{background:'var(--card)',borderColor:'var(--border)'}}>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr style={{background:'rgba(255,255,255,0.03)'}}>
+            <th className="px-3 py-2 text-left font-semibold" style={{color:'var(--textSub)',width:'50px'}}>ID</th>
+            <th className="px-3 py-2 text-left font-semibold" style={{color:'var(--textSub)'}}>Otázka</th>
+            <th className="px-3 py-2 text-left font-semibold" style={{color:'var(--textSub)',width:'180px'}}>Odpoveď</th>
+            <th className="px-3 py-2 text-left font-semibold" style={{color:'var(--textSub)',width:'140px'}}>Kategória</th>
+            <th className="px-3 py-2 text-center font-semibold" style={{color:'var(--textSub)',width:'80px'}}>Diff</th>
+            <th className="px-3 py-2 text-center font-semibold" style={{color:'var(--textSub)',width:'60px'}}>Scope</th>
+            <th className="px-3 py-2 text-center font-semibold" style={{color:'var(--textSub)',width:'90px'}}>Akcie</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pageQ.map(q=>(
+            <tr key={q.id} className="border-t hover:bg-white/5 transition-colors" style={{borderColor:'var(--border)'}}>
+              <td className="px-3 py-2 font-mono text-xs" style={{color:'var(--textSub)'}}>{q.id}{q.img&&' 🖼️'}{q.type==='tiebreaker'&&' ⚡'}{duplicates.has(q.id)&&<span className="text-yellow-400" title="Možný duplikát"> ⚠️</span>}</td>
+              <td className="px-3 py-2">
+                <div className="line-clamp-2">{q.question}</div>
+                {q.img&&<img src={q.img} className="mt-1 h-8 rounded" alt="" onError={e=>{e.target.style.display='none'}}/>}
+              </td>
+              <td className="px-3 py-2 font-semibold text-green-400">{q.answer}</td>
+              <td className="px-3 py-2 text-xs">{CAT_ICONS[q.category]||'❓'} {CAT_LABELS[q.category]||q.category}</td>
+              <td className="px-3 py-2 text-center"><span className={`text-xs px-1.5 py-0.5 rounded-full ${q.difficulty==='junior'?'bg-green-500/20 text-green-400':q.difficulty==='level1'?'bg-yellow-500/20 text-yellow-400':'bg-red-500/20 text-red-400'}`}>{q.difficulty==='junior'?'J':q.difficulty==='level1'?'L1':'L2'}</span></td>
+              <td className="px-3 py-2 text-center text-xs">{q.scope==='sk'?'🇸🇰':'🌍'}</td>
+              <td className="px-3 py-2 text-center">
+                <button onClick={()=>{setEditQ({...q});setShowModal(true)}} className="text-blue-400 hover:text-blue-300 mr-2" title="Upraviť">✏️</button>
+                <button onClick={()=>deleteQ(q.id)} className="text-red-400 hover:text-red-300" title="Odstrániť">🗑️</button>
+              </td>
+            </tr>
+          ))}
+          {pageQ.length===0&&<tr><td colSpan="7" className="text-center py-8" style={{color:'var(--textSub)'}}>Žiadne otázky nenájdené</td></tr>}
+        </tbody>
+      </table>
+    </div>
+    {/* Pagination */}
+    {totalPg>1&&(
+      <div className="flex items-center justify-between px-4 py-3 border-t" style={{borderColor:'var(--border)'}}>
+        <Btn cls="text-sm" style={{color:'var(--textSub)'}} onClick={()=>setPage(Math.max(0,page-1))} disabled={page===0}>← Predošlá</Btn>
+        <div className="flex gap-1 flex-wrap justify-center">
+          {Array.from({length:Math.min(totalPg,10)},(_,i)=>{
+            let p;
+            if(totalPg<=10)p=i;
+            else if(page<5)p=i;
+            else if(page>totalPg-6)p=totalPg-10+i;
+            else p=page-5+i;
+            return <button key={p} onClick={()=>setPage(p)} className={`w-8 h-8 rounded-lg text-xs font-semibold transition-colors ${p===page?'bg-accent text-black':'hover:bg-white/10'}`}>{p+1}</button>;
+          })}
+          {totalPg>10&&<span className="text-xs self-center" style={{color:'var(--textSub)'}}>z {totalPg}</span>}
+        </div>
+        <Btn cls="text-sm" style={{color:'var(--textSub)'}} onClick={()=>setPage(Math.min(totalPg-1,page+1))} disabled={page>=totalPg-1}>Ďalšia →</Btn>
+      </div>
+    )}
+  </div>
+
+  {/* Add/Edit Modal */}
+  {showModal&&<QEditModal q={editQ} onSave={saveQ} onClose={()=>{setShowModal(false);setEditQ(null)}} allCats={allCats}/>}
+</div>
+);
+}
+
+/* ── Question Edit Modal ── */
+function QEditModal({q,onSave,onClose,allCats}){
+const isNew=!q||!q.id;
+const[form,setForm]=useState({
+  question:q?.question||'',answer:q?.answer||'',
+  category:q?.category||'zaujimavosti_sk',difficulty:q?.difficulty||'level1',
+  scope:q?.scope||'sk',type:q?.type||'normal',img:q?.img||'',
+});
+const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+const valid=form.question.trim()&&form.answer.trim();
+const submit=(e)=>{e.preventDefault();if(!valid)return;
+  const out={...form,question:form.question.trim(),answer:form.answer.trim()};
+  if(!out.img)delete out.img;
+  onSave(out);
+};
+/* Available categories based on scope */
+const scopeCats=(form.scope==='sk'?SK_CATS:SVET_CATS);
+return(
+<div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{background:'rgba(0,0,0,0.7)'}}>
+  <form onSubmit={submit} className="w-full max-w-lg rounded-2xl p-6 border shadow-2xl" style={{background:'var(--bg)',borderColor:'var(--border)',maxHeight:'90vh',overflowY:'auto'}}>
+    <h3 className="text-xl font-bold mb-4">{isNew?'➕ Nová otázka':'✏️ Upraviť otázku'}{!isNew&&<span className="text-sm font-mono ml-2" style={{color:'var(--textSub)'}}>#{q.id}</span>}</h3>
+
+    <label className="block text-xs mb-1 font-semibold" style={{color:'var(--textSub)'}}>Otázka *</label>
+    <textarea value={form.question} onChange={e=>set('question',e.target.value)} rows="3"
+      className="w-full rounded-xl px-3 py-2 mb-3 outline-none focus:ring-2 ring-accent text-sm" style={{background:'var(--inputBg)',color:'var(--text)',resize:'vertical'}} autoFocus/>
+
+    <label className="block text-xs mb-1 font-semibold" style={{color:'var(--textSub)'}}>Odpoveď *</label>
+    <input value={form.answer} onChange={e=>set('answer',e.target.value)}
+      className="w-full rounded-xl px-3 py-2 mb-3 outline-none focus:ring-2 ring-accent text-sm" style={{background:'var(--inputBg)',color:'var(--text)'}}/>
+
+    <div className="grid grid-cols-2 gap-3 mb-3">
+      <div>
+        <label className="block text-xs mb-1 font-semibold" style={{color:'var(--textSub)'}}>Rozsah</label>
+        <select value={form.scope} onChange={e=>{set('scope',e.target.value);if(!scopeCats.includes(form.category))set('category',e.target.value==='sk'?'zaujimavosti_sk':'zaujimavosti_svet')}}
+          className="w-full rounded-xl px-3 py-2 outline-none text-sm" style={{background:'var(--inputBg)',color:'var(--text)'}}>
+          <option value="sk">🇸🇰 Slovensko</option><option value="svet">🌍 Svet</option>
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs mb-1 font-semibold" style={{color:'var(--textSub)'}}>Obtiažnosť</label>
+        <select value={form.difficulty} onChange={e=>set('difficulty',e.target.value)}
+          className="w-full rounded-xl px-3 py-2 outline-none text-sm" style={{background:'var(--inputBg)',color:'var(--text)'}}>
+          <option value="junior">🟢 Junior (7–12)</option><option value="level1">🟡 Level 1 (13–18)</option><option value="level2">🔴 Level 2 (18–99)</option>
+        </select>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-2 gap-3 mb-3">
+      <div>
+        <label className="block text-xs mb-1 font-semibold" style={{color:'var(--textSub)'}}>Kategória</label>
+        <select value={form.category} onChange={e=>set('category',e.target.value)}
+          className="w-full rounded-xl px-3 py-2 outline-none text-sm" style={{background:'var(--inputBg)',color:'var(--text)'}}>
+          {scopeCats.map(c=><option key={c} value={c}>{CAT_ICONS[c]||''} {CAT_LABELS[c]||c}</option>)}
+          {!scopeCats.includes(form.category)&&<option value={form.category}>{CAT_LABELS[form.category]||form.category}</option>}
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs mb-1 font-semibold" style={{color:'var(--textSub)'}}>Typ</label>
+        <select value={form.type} onChange={e=>set('type',e.target.value)}
+          className="w-full rounded-xl px-3 py-2 outline-none text-sm" style={{background:'var(--inputBg)',color:'var(--text)'}}>
+          <option value="normal">Normálna</option><option value="tiebreaker">⚡ Rozstrel</option>
+        </select>
+      </div>
+    </div>
+
+    <label className="block text-xs mb-1 font-semibold" style={{color:'var(--textSub)'}}>Obrázok URL (voliteľné)</label>
+    <input value={form.img} onChange={e=>set('img',e.target.value)} placeholder="https://..."
+      className="w-full rounded-xl px-3 py-2 mb-1 outline-none focus:ring-2 ring-accent text-sm" style={{background:'var(--inputBg)',color:'var(--text)'}}/>
+    {form.img&&<img src={form.img} className="h-16 rounded-lg mb-3 mt-1" alt="Preview" onError={e=>{e.target.style.display='none'}}/>}
+
+    <div className="flex gap-2 mt-4">
+      <Btn cls="flex-1 bg-accent text-black hover:bg-yellow-400 font-bold" disabled={!valid}>{isNew?'Pridať otázku':'Uložiť zmeny'}</Btn>
+      <Btn cls="px-6 border" type="button" style={{borderColor:'var(--border)',color:'var(--textSub)'}} onClick={onClose}>Zrušiť</Btn>
+    </div>
+  </form>
+</div>
+);
+}
+
 /* ════════════ APP ════════════ */
 function App(){
 const{st}=use$();
@@ -2042,6 +2383,7 @@ switch(st.screen){
     case 'leaderboard':return <LeaderboardScreen/>;
     case 'hist':return <HistoryScreen/>;
     case 'settings':return <SettingsScreen/>;
+    case 'qeditor':return <QuestionEditorScreen/>;
     default:return <HomeScreen/>;
 }
 }
