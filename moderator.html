@@ -205,9 +205,10 @@ const SVET_CATS=['dejiny_svet','geografia_svet','hlavne_mesta','sport_svet','ope
 const SCOPE_CATS={sk:SK_CATS,svet:SVET_CATS};
 function pickRoundCats(diff,scope,n=10){
     let base;
-    if(scope&&scope.startsWith('group:')){
-      const gid=+scope.split(':')[1];
-      base=[...new Set(QUESTIONS_DB.filter(q=>q.group===gid&&q.type!=='tiebreaker').map(q=>q.category))];
+    const gids=_scopeGroupIds(scope);
+    if(gids.length){
+      const gset=new Set(gids);
+      base=[...new Set(QUESTIONS_DB.filter(q=>gset.has(q.group)&&q.type!=='tiebreaker').map(q=>q.category))];
     }else{
       base=scope==='mix'?[...new Set([...SK_CATS,...SVET_CATS])]:(SCOPE_CATS[scope]||SK_CATS);
     }
@@ -403,11 +404,20 @@ return ids;
 }
 function _scopeFilter(scope){
   if(scope==='mix')return ()=>true;
+  if(scope&&scope.startsWith('groups:')){
+    const gids=new Set(scope.split(':')[1].split(',').map(Number));
+    return q=>gids.has(q.group);
+  }
   if(scope&&scope.startsWith('group:')){
     const gid=+scope.split(':')[1];
     return q=>q.group===gid;
   }
   return q=>q.scope===scope;
+}
+function _scopeGroupIds(scope){
+  if(scope&&scope.startsWith('groups:'))return scope.split(':')[1].split(',').map(Number);
+  if(scope&&scope.startsWith('group:'))return [+scope.split(':')[1]];
+  return [];
 }
 function pickQ(diff,usedIds,cat=null,type=null,scope='sk'){
 const _sf=_scopeFilter(scope);
@@ -421,9 +431,10 @@ return pool[Math.floor(Math.random()*pool.length)];
 function getCats(diff,round,roundCats,scope){
 const _sf=_scopeFilter(scope);
 if(roundCats&&roundCats.length)return roundCats.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&_sf(q)&&q.type!=='tiebreaker'));
-if(scope&&scope.startsWith('group:')){
-  const gid=+scope.split(':')[1];
-  const cats=[...new Set(QUESTIONS_DB.filter(q=>q.group===gid&&q.type!=='tiebreaker').map(q=>q.category))];
+const _gids=_scopeGroupIds(scope);
+if(_gids.length){
+  const gset=new Set(_gids);
+  const cats=[...new Set(QUESTIONS_DB.filter(q=>gset.has(q.group)&&q.type!=='tiebreaker').map(q=>q.category))];
   return cats.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&_sf(q)&&q.type!=='tiebreaker'));
 }
 const base=scope==='mix'?[...new Set([...SK_CATS,...SVET_CATS])]:(SCOPE_CATS[scope||'sk']||SK_CATS);
@@ -1038,11 +1049,17 @@ const[scope,setScope]=useState(st.scope||'sk');
 const[voiceGender,setVoiceGender]=useState(st.voiceGender||'male');
 const[rounds,setRounds]=useState(3);
 const[groups]=useState(()=>loadGroups());
-const[selGroup,setSelGroup]=useState(groups.length?groups[0].id:null);
-const isGroupScope=scope.startsWith('group:');
-const activeGroupId=isGroupScope?+scope.split(':')[1]:null;
-const activeGroup=groups.find(g=>g.id===activeGroupId);
-const grpQCount=activeGroup?QUESTIONS_DB.filter(q=>q.group===activeGroupId).length:0;
+const[selGroups,setSelGroups]=useState(()=>groups.length?[groups[0].id]:[]);
+const isGroupScope=scope.startsWith('group');
+const activeGroupIds=isGroupScope?_scopeGroupIds(scope):[];
+const activeGroups=groups.filter(g=>activeGroupIds.includes(g.id));
+const grpQCount=activeGroupIds.length?QUESTIONS_DB.filter(q=>activeGroupIds.includes(q.group)).length:0;
+const toggleGroup=(gid)=>{
+  const cur=selGroups.includes(gid)?selGroups.filter(x=>x!==gid):[...selGroups,gid];
+  setSelGroups(cur);
+  if(cur.length)setScope('groups:'+cur.join(','));
+  else setScope('sk');
+};
 const canStart=p1id&&p2id&&p1id!==p2id;
 const doStart=(test=false)=>{
     const pl1=st.players.find(p=>p.id===+p1id),pl2=st.players.find(p=>p.id===+p2id);
@@ -1107,18 +1124,33 @@ return(
                     <button onClick={()=>setScope('mix')}
                         className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${scope==='mix'?'bg-accent text-black shadow-lg shadow-yellow-500/20':'hover:opacity-80'}`}
                         style={scope!=='mix'?{background:'var(--card2)'}:{}}>🔀 MIX</button>
-                    {groups.length>0&&<button onClick={()=>setScope('group:'+(selGroup||groups[0].id))}
+                    {groups.length>0&&<button onClick={()=>{const ids=selGroups.length?selGroups:[groups[0].id];if(!selGroups.length)setSelGroups(ids);setScope('groups:'+ids.join(','))}}
                         className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${isGroupScope?'bg-purple-600 text-white shadow-lg shadow-purple-500/20':'hover:opacity-80'}`}
-                        style={!isGroupScope?{background:'var(--card2)'}:{}}>📦 SKUPINA</button>}
+                        style={!isGroupScope?{background:'var(--card2)'}:{}}>📦 SKUPINY</button>}
                 </div>
                 {isGroupScope&&(
-                  <div className="mt-2">
-                    <select value={activeGroupId||''} onChange={e=>setScope('group:'+e.target.value)}
-                      className="w-full rounded-xl px-3 py-2 outline-none focus:ring-2 ring-purple-400 text-sm font-semibold" style={{background:'var(--inputBg)',color:'var(--text)'}}>
-                      {groups.map(g=><option key={g.id} value={g.id}>📦 {g.name} ({g.cats.length} tém, {QUESTIONS_DB.filter(q=>q.group===g.id).length} otázok)</option>)}
-                    </select>
-                    {activeGroup&&<p className="text-xs mt-1" style={{color:'var(--textSub)'}}>Témy: {activeGroup.cats.map(c=>c.icon+' '+c.label).join(', ')} · <b>{grpQCount}</b> otázok</p>}
-                    {grpQCount<10&&<p className="text-xs text-yellow-400 mt-1">⚠️ Málo otázok v skupine – odporúčame min. 30</p>}
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs font-semibold" style={{color:'var(--textSub)'}}>Zaškrtni skupiny pre hru:</p>
+                    {groups.map(g=>{
+                      const checked=selGroups.includes(g.id);
+                      const cnt=QUESTIONS_DB.filter(q=>q.group===g.id).length;
+                      return(
+                      <label key={g.id} onClick={()=>toggleGroup(g.id)}
+                        className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${checked?'border-purple-500 bg-purple-500/10':'hover:bg-white/5'}`}
+                        style={{borderColor:checked?'':'var(--border)'}}>
+                        <div className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold ${checked?'bg-purple-600 text-white':'border-2'}`}
+                          style={!checked?{borderColor:'var(--border)'}:{}}>{checked?'✓':''}</div>
+                        <div className="flex-1">
+                          <span className="font-semibold text-sm">📦 {g.name}</span>
+                          <span className="text-xs ml-2" style={{color:'var(--textSub)'}}>{g.cats.length} tém · {cnt} otázok</span>
+                          <p className="text-xs mt-0.5" style={{color:'var(--textSub)'}}>{g.cats.map(c=>c.icon+' '+c.label).join(', ')}</p>
+                        </div>
+                      </label>)
+                    })}
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="text-xs font-bold" style={{color:'var(--textSub)'}}>Vybraných: {activeGroups.length} skupín · <span className="text-purple-400">{grpQCount} otázok</span></span>
+                    </div>
+                    {grpQCount<10&&<p className="text-xs text-yellow-400">⚠️ Málo otázok – odporúčame min. 30</p>}
                   </div>
                 )}
             </div>
