@@ -170,6 +170,21 @@ zaujimavosti_svet:'from-yellow-500/20 to-yellow-600/5 border-yellow-500/50',
 olympijske_hry:'from-orange-500/20 to-orange-600/5 border-orange-500/50',
 kulinarka:'from-stone-500/20 to-stone-600/5 border-stone-500/50',
 };
+
+/* ─── CUSTOM GROUPS ─── */
+const GRP_COLORS=['from-teal-500/20 to-teal-600/5 border-teal-500/50','from-rose-500/20 to-rose-600/5 border-rose-500/50','from-indigo-500/20 to-indigo-600/5 border-indigo-500/50','from-amber-500/20 to-amber-600/5 border-amber-500/50','from-fuchsia-500/20 to-fuchsia-600/5 border-fuchsia-500/50','from-cyan-500/20 to-cyan-600/5 border-cyan-500/50','from-lime-500/20 to-lime-600/5 border-lime-500/50','from-orange-500/20 to-orange-600/5 border-orange-500/50'];
+function loadGroups(){try{const v=localStorage.getItem('duel_groups');return v?JSON.parse(v):[]}catch{return[]}}
+function saveGroups(g){try{localStorage.setItem('duel_groups',JSON.stringify(g))}catch(e){console.warn(e)}registerGroupCats(g)}
+function registerGroupCats(groups){
+  (groups||[]).forEach(g=>g.cats.forEach((c,i)=>{
+    CAT_LABELS[c.key]=c.label;
+    CAT_ICONS[c.key]=c.icon||'📦';
+    if(!CAT_COLORS[c.key])CAT_COLORS[c.key]=GRP_COLORS[i%GRP_COLORS.length];
+  }));
+}
+const _initGroups=loadGroups();
+registerGroupCats(_initGroups);
+
 const R2_PTS=[10,20,30,40,50];
 const R3_PTS=Array.from({length:36},(_,i)=>i*10);
 const R1_TIME=90;
@@ -189,8 +204,15 @@ const SVET_CATS=['dejiny_svet','geografia_svet','hlavne_mesta','sport_svet','ope
     'informatika_svet','astronomia','zaujimavosti_svet','olympijske_hry','kulinarka'];
 const SCOPE_CATS={sk:SK_CATS,svet:SVET_CATS};
 function pickRoundCats(diff,scope,n=10){
-    const base=scope==='mix'?[...new Set([...SK_CATS,...SVET_CATS])]:(SCOPE_CATS[scope]||SK_CATS);
-    const avail=base.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&(scope==='mix'||q.scope===scope)&&q.type!=='tiebreaker'));
+    let base;
+    if(scope&&scope.startsWith('group:')){
+      const gid=+scope.split(':')[1];
+      base=[...new Set(QUESTIONS_DB.filter(q=>q.group===gid&&q.type!=='tiebreaker').map(q=>q.category))];
+    }else{
+      base=scope==='mix'?[...new Set([...SK_CATS,...SVET_CATS])]:(SCOPE_CATS[scope]||SK_CATS);
+    }
+    const _sf=_scopeFilter(scope);
+    const avail=base.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&_sf(q)&&q.type!=='tiebreaker'));
     const shuffled=[...avail].sort(()=>Math.random()-.5);
     return shuffled.slice(0,n);
 }
@@ -379,8 +401,16 @@ const ids=new Set();
 hist.slice(-10).forEach(h=>{if(h.usedQIds)h.usedQIds.forEach(id=>ids.add(id))});
 return ids;
 }
+function _scopeFilter(scope){
+  if(scope==='mix')return ()=>true;
+  if(scope&&scope.startsWith('group:')){
+    const gid=+scope.split(':')[1];
+    return q=>q.group===gid;
+  }
+  return q=>q.scope===scope;
+}
 function pickQ(diff,usedIds,cat=null,type=null,scope='sk'){
-const _sf=scope==='mix'?(()=>true):(q=>q.scope===scope);
+const _sf=_scopeFilter(scope);
 /* Primárny pool: správna obtiažnosť + nepoužité */
 let pool=QUESTIONS_DB.filter(q=>q.difficulty===diff&&_sf(q)&&!usedIds.has(q.id)&&(cat?q.category===cat:true)&&(type?q.type===type:q.type!=='tiebreaker'));
 /* Ak v danej obtiažnosti nie sú, skús ľubovoľnú obtiažnosť (ale stále nepoužité!) */
@@ -389,8 +419,13 @@ if(!pool.length){console.warn('[QUIZ] Žiadne nové otázky pre:',{diff,cat,type
 return pool[Math.floor(Math.random()*pool.length)];
 }
 function getCats(diff,round,roundCats,scope){
-const _sf=scope==='mix'?(()=>true):(q=>q.scope===scope);
+const _sf=_scopeFilter(scope);
 if(roundCats&&roundCats.length)return roundCats.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&_sf(q)&&q.type!=='tiebreaker'));
+if(scope&&scope.startsWith('group:')){
+  const gid=+scope.split(':')[1];
+  const cats=[...new Set(QUESTIONS_DB.filter(q=>q.group===gid&&q.type!=='tiebreaker').map(q=>q.category))];
+  return cats.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&_sf(q)&&q.type!=='tiebreaker'));
+}
 const base=scope==='mix'?[...new Set([...SK_CATS,...SVET_CATS])]:(SCOPE_CATS[scope||'sk']||SK_CATS);
 return base.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&_sf(q)&&q.type!=='tiebreaker'));
 }
@@ -1002,6 +1037,12 @@ const[date,setDate]=useState(st.gameDate);
 const[scope,setScope]=useState(st.scope||'sk');
 const[voiceGender,setVoiceGender]=useState(st.voiceGender||'male');
 const[rounds,setRounds]=useState(3);
+const[groups]=useState(()=>loadGroups());
+const[selGroup,setSelGroup]=useState(groups.length?groups[0].id:null);
+const isGroupScope=scope.startsWith('group:');
+const activeGroupId=isGroupScope?+scope.split(':')[1]:null;
+const activeGroup=groups.find(g=>g.id===activeGroupId);
+const grpQCount=activeGroup?QUESTIONS_DB.filter(q=>q.group===activeGroupId).length:0;
 const canStart=p1id&&p2id&&p1id!==p2id;
 const doStart=(test=false)=>{
     const pl1=st.players.find(p=>p.id===+p1id),pl2=st.players.find(p=>p.id===+p2id);
@@ -1056,7 +1097,7 @@ return(
             {p1id&&p2id&&p1id===p2id&&<p className="text-red-400 text-sm">Vyber rôznych hráčov!</p>}
             <div>
                 <label className="block text-sm mb-2" style={{color:'var(--textSub)'}}>Rozsah otázok</label>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                     <button onClick={()=>setScope('sk')}
                         className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${scope==='sk'?'bg-accent text-black shadow-lg shadow-yellow-500/20':'hover:opacity-80'}`}
                         style={scope!=='sk'?{background:'var(--card2)'}:{}}>🇸🇰 SK</button>
@@ -1066,7 +1107,20 @@ return(
                     <button onClick={()=>setScope('mix')}
                         className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${scope==='mix'?'bg-accent text-black shadow-lg shadow-yellow-500/20':'hover:opacity-80'}`}
                         style={scope!=='mix'?{background:'var(--card2)'}:{}}>🔀 MIX</button>
+                    {groups.length>0&&<button onClick={()=>setScope('group:'+(selGroup||groups[0].id))}
+                        className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${isGroupScope?'bg-purple-600 text-white shadow-lg shadow-purple-500/20':'hover:opacity-80'}`}
+                        style={!isGroupScope?{background:'var(--card2)'}:{}}>📦 SKUPINA</button>}
                 </div>
+                {isGroupScope&&(
+                  <div className="mt-2">
+                    <select value={activeGroupId||''} onChange={e=>setScope('group:'+e.target.value)}
+                      className="w-full rounded-xl px-3 py-2 outline-none focus:ring-2 ring-purple-400 text-sm font-semibold" style={{background:'var(--inputBg)',color:'var(--text)'}}>
+                      {groups.map(g=><option key={g.id} value={g.id}>📦 {g.name} ({g.cats.length} tém, {QUESTIONS_DB.filter(q=>q.group===g.id).length} otázok)</option>)}
+                    </select>
+                    {activeGroup&&<p className="text-xs mt-1" style={{color:'var(--textSub)'}}>Témy: {activeGroup.cats.map(c=>c.icon+' '+c.label).join(', ')} · <b>{grpQCount}</b> otázok</p>}
+                    {grpQCount<10&&<p className="text-xs text-yellow-400 mt-1">⚠️ Málo otázok v skupine – odporúčame min. 30</p>}
+                  </div>
+                )}
             </div>
             <div>
                 <label className="block text-sm mb-2" style={{color:'var(--textSub)'}}>Počet kôl</label>
@@ -2220,7 +2274,12 @@ const[fDiff,setFDiff]=useState('');
 const[fScope,setFScope]=useState('');
 const[fType,setFType]=useState('');
 const[fImg,setFImg]=useState('');
-const[page,setPage]=useState(0);
+const[fGroup,setFGroup]=useState('');
+const[editorTab,setEditorTab]=useState('questions'); /* questions | groups */
+const[groups,setGroupsState]=useState(()=>loadGroups());
+const setGroups=(g)=>{saveGroups(g);setGroupsState(g)};
+const[grpModal,setGrpModal]=useState(null); /* null | {id?,name} */
+const[catModal,setCatModal]=useState(null); /* null | {groupId,key?,label,icon} */const[page,setPage]=useState(0);
 const[showModal,setShowModal]=useState(false);
 const[editQ,setEditQ]=useState(null);
 const[toast,setToast]=useState('');
@@ -2236,8 +2295,9 @@ const filtered=useMemo(()=>questions.filter(q=>{
   if(fType&&q.type!==fType)return false;
   if(fImg==='yes'&&!q.img)return false;
   if(fImg==='no'&&q.img)return false;
+  if(fGroup&&String(q.group||'')!==fGroup)return false;
   return true;
-}),[questions,search,fCat,fDiff,fScope,fType,fImg]);
+}),[questions,search,fCat,fDiff,fScope,fType,fImg,fGroup]);
 
 const totalPg=Math.ceil(filtered.length/PG);
 const pageQ=filtered.slice(page*PG,(page+1)*PG);
@@ -2342,6 +2402,150 @@ return(
     </div>
   </div>
 
+  {/* Tabs */}
+  <div className="flex gap-1 mb-4 border-b pb-2" style={{borderColor:'var(--border)'}}>
+    <button onClick={()=>setEditorTab('questions')} className={`px-4 py-2 rounded-t-xl font-bold text-sm transition-all ${editorTab==='questions'?'bg-accent text-black':'hover:opacity-80'}`} style={editorTab!=='questions'?{color:'var(--textSub)'}:{}}>📋 Otázky</button>
+    <button onClick={()=>setEditorTab('groups')} className={`px-4 py-2 rounded-t-xl font-bold text-sm transition-all ${editorTab==='groups'?'bg-purple-600 text-white':'hover:opacity-80'}`} style={editorTab!=='groups'?{color:'var(--textSub)'}:{}}>📦 Skupiny ({groups.length})</button>
+  </div>
+
+  {/* ═══ GROUPS TAB ═══ */}
+  {editorTab==='groups'&&(<div>
+    <div className="flex items-center justify-between mb-4">
+      <p style={{color:'var(--textSub)'}} className="text-sm">Vytvor si vlastné skupiny s témami a otázkami. Pri nastavení hry zvoľ „📦 Skupina".</p>
+      <Btn cls="bg-purple-600 text-white text-sm hover:bg-purple-500" onClick={()=>setGrpModal({name:''})}>➕ Nová skupina</Btn>
+    </div>
+    {groups.length===0&&<Card><p className="text-center py-8" style={{color:'var(--textSub)'}}>Žiadne skupiny. Vytvor prvú!</p></Card>}
+    {groups.map(g=>{
+      const gqs=questions.filter(q=>q.group===g.id);
+      return(
+      <Card key={g.id} cls="mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">📦</span>
+            <div>
+              <h3 className="text-lg font-bold">{g.name}</h3>
+              <p className="text-xs" style={{color:'var(--textSub)'}}>{g.cats.length} tém · {gqs.length} otázok</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={()=>setGrpModal({id:g.id,name:g.name})} className="text-blue-400 hover:text-blue-300 text-sm" title="Premenovať">✏️</button>
+            <button onClick={()=>{if(!confirm('Odstrániť skupinu „'+g.name+'" a všetky jej otázky?'))return;
+              persist(questions.filter(q=>q.group!==g.id));setGroups(groups.filter(x=>x.id!==g.id));flash('🗑️ Skupina odstránená')}}
+              className="text-red-400 hover:text-red-300 text-sm" title="Odstrániť">🗑️</button>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3">
+          {g.cats.map(c=>{
+            const cqs=gqs.filter(q=>q.category===c.key);
+            return(
+            <div key={c.key} className="rounded-xl p-3 border flex items-center justify-between" style={{background:'var(--card2)',borderColor:'var(--border)'}}>
+              <div className="flex items-center gap-2">
+                <span className="text-xl">{c.icon||'📦'}</span>
+                <div>
+                  <span className="font-semibold text-sm">{c.label}</span>
+                  <span className="text-xs ml-2" style={{color:'var(--textSub)'}}>{cqs.length}q</span>
+                </div>
+              </div>
+              <div className="flex gap-1">
+                <button onClick={()=>{setEditQ({group:g.id,category:c.key,scope:'group',difficulty:'level1',type:'normal'});setShowModal(true)}}
+                  className="text-green-400 hover:text-green-300 text-xs" title="Pridať otázku">➕</button>
+                <button onClick={()=>setCatModal({groupId:g.id,key:c.key,label:c.label,icon:c.icon})}
+                  className="text-blue-400 hover:text-blue-300 text-xs" title="Upraviť tému">✏️</button>
+                <button onClick={()=>{if(!confirm('Odstrániť tému „'+c.label+'" a jej otázky?'))return;
+                  persist(questions.filter(q=>!(q.group===g.id&&q.category===c.key)));
+                  setGroups(groups.map(x=>x.id===g.id?{...x,cats:x.cats.filter(cc=>cc.key!==c.key)}:x));flash('🗑️ Téma odstránená')}}
+                  className="text-red-400 hover:text-red-300 text-xs" title="Odstrániť tému">🗑️</button>
+              </div>
+            </div>)
+          })}
+          <button onClick={()=>setCatModal({groupId:g.id,label:'',icon:'📦'})}
+            className="rounded-xl p-3 border-2 border-dashed flex items-center justify-center gap-2 text-sm font-semibold transition-all hover:border-purple-400 hover:text-purple-400"
+            style={{borderColor:'var(--border)',color:'var(--textSub)'}}>
+            ➕ Pridať tému
+          </button>
+        </div>
+        {gqs.length>0&&(
+          <details className="mt-2">
+            <summary className="text-xs font-semibold cursor-pointer" style={{color:'var(--textSub)'}}>📋 Zobraziť otázky ({gqs.length})</summary>
+            <div className="mt-2 space-y-1 max-h-60 overflow-y-auto">
+              {gqs.map(q=>(
+                <div key={q.id} className="flex items-center justify-between rounded-lg px-3 py-1.5 text-xs" style={{background:'var(--card2)'}}>
+                  <div className="flex-1 mr-2">
+                    <span className="font-semibold">{q.question}</span>
+                    <span className="ml-2 text-green-400">{q.answer}</span>
+                    <span className="ml-2" style={{color:'var(--textSub)'}}>{CAT_ICONS[q.category]||''} {CAT_LABELS[q.category]||q.category}</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={()=>{setEditQ({...q});setShowModal(true)}} className="text-blue-400">✏️</button>
+                    <button onClick={()=>deleteQ(q.id)} className="text-red-400">🗑️</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+      </Card>)
+    })}
+
+    {/* Group Modal */}
+    {grpModal!==null&&(
+      <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{background:'rgba(0,0,0,0.7)'}}>
+        <div className="w-full max-w-sm rounded-2xl p-6 border shadow-2xl" style={{background:'var(--bg)',borderColor:'var(--border)'}}>
+          <h3 className="text-lg font-bold mb-4">{grpModal.id?'✏️ Premenovať skupinu':'➕ Nová skupina'}</h3>
+          <input value={grpModal.name} onChange={e=>setGrpModal({...grpModal,name:e.target.value})} placeholder="Názov skupiny…"
+            className="w-full rounded-xl px-3 py-2 mb-4 outline-none focus:ring-2 ring-purple-400 text-sm" style={{background:'var(--inputBg)',color:'var(--text)'}} autoFocus/>
+          <div className="flex gap-2">
+            <Btn cls="flex-1 bg-purple-600 text-white hover:bg-purple-500 font-bold" onClick={()=>{
+              if(!grpModal.name.trim())return;
+              if(grpModal.id){setGroups(groups.map(g=>g.id===grpModal.id?{...g,name:grpModal.name.trim()}:g));flash('✅ Skupina premenovaná')}
+              else{const nid=groups.reduce((m,g)=>Math.max(m,g.id),0)+1;setGroups([...groups,{id:nid,name:grpModal.name.trim(),cats:[]}]);flash('✅ Skupina vytvorená')}
+              setGrpModal(null);
+            }}>{grpModal.id?'Uložiť':'Vytvoriť'}</Btn>
+            <Btn cls="px-6 border" type="button" style={{borderColor:'var(--border)',color:'var(--textSub)'}} onClick={()=>setGrpModal(null)}>Zrušiť</Btn>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Category Modal */}
+    {catModal!==null&&(
+      <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{background:'rgba(0,0,0,0.7)'}}>
+        <div className="w-full max-w-sm rounded-2xl p-6 border shadow-2xl" style={{background:'var(--bg)',borderColor:'var(--border)'}}>
+          <h3 className="text-lg font-bold mb-4">{catModal.key?'✏️ Upraviť tému':'➕ Nová téma'}</h3>
+          <label className="block text-xs mb-1 font-semibold" style={{color:'var(--textSub)'}}>Názov témy</label>
+          <input value={catModal.label} onChange={e=>setCatModal({...catModal,label:e.target.value})} placeholder="napr. Film, Hudba, Rodina…"
+            className="w-full rounded-xl px-3 py-2 mb-3 outline-none focus:ring-2 ring-purple-400 text-sm" style={{background:'var(--inputBg)',color:'var(--text)'}} autoFocus/>
+          <label className="block text-xs mb-1 font-semibold" style={{color:'var(--textSub)'}}>Ikona (emoji)</label>
+          <div className="flex flex-wrap gap-1 mb-4">
+            {['🎬','🎵','🎮','⚽','🧪','📚','🌍','🏛️','🎭','🎨','🔬','💡','🦊','🌿','🏔️','🚗','✈️','🍽️','👨‍👩‍👧‍👦','⭐'].map(e=>(
+              <button key={e} type="button" onClick={()=>setCatModal({...catModal,icon:e})}
+                className={`w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all ${catModal.icon===e?'ring-2 ring-purple-400 bg-purple-500/20':'hover:bg-white/10'}`}>{e}</button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Btn cls="flex-1 bg-purple-600 text-white hover:bg-purple-500 font-bold" onClick={()=>{
+              if(!catModal.label.trim())return;
+              const gid=catModal.groupId;
+              if(catModal.key){
+                setGroups(groups.map(g=>g.id===gid?{...g,cats:g.cats.map(c=>c.key===catModal.key?{...c,label:catModal.label.trim(),icon:catModal.icon}:c)}:g));
+                flash('✅ Téma upravená');
+              }else{
+                const key='grp'+gid+'_'+catModal.label.trim().toLowerCase().replace(/[^a-z0-9áéíóúýčďľňřšťžôä]/gi,'_').replace(/_+/g,'_').slice(0,20)+'_'+Date.now()%1000;
+                setGroups(groups.map(g=>g.id===gid?{...g,cats:[...g.cats,{key,label:catModal.label.trim(),icon:catModal.icon||'📦'}]}:g));
+                flash('✅ Téma pridaná');
+              }
+              setCatModal(null);
+            }}>{catModal.key?'Uložiť':'Pridať'}</Btn>
+            <Btn cls="px-6 border" type="button" style={{borderColor:'var(--border)',color:'var(--textSub)'}} onClick={()=>setCatModal(null)}>Zrušiť</Btn>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>)}
+
+  {/* ═══ QUESTIONS TAB ═══ */}
+  {editorTab==='questions'&&(<div>
+
   {/* Stats */}
   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mb-4">
     {[['Celkom',stats.total,'📊'],['🇸🇰 SK',stats.sk,''],['🌍 Svet',stats.svet,''],['Junior',stats.junior,'🟢'],['Level 1',stats.level1,'🟡'],['Level 2',stats.level2,'🔴'],['Obrázky',stats.img,'🖼️'],['Rozstrel',stats.tb,'⚡']].map(([l,v,ic])=>(
@@ -2392,7 +2596,14 @@ return(
           <option value="">Všetky</option><option value="yes">S obrázkom</option><option value="no">Bez obrázka</option>
         </select>
       </div>
-      {(search||fCat||fDiff||fScope||fType||fImg)&&<Btn cls="text-xs text-red-400 hover:text-red-300" onClick={()=>{setSearch('');setFCat('');setFDiff('');setFScope('');setFType('');setFImg('');setPage(0)}}>✕ Zrušiť filtre</Btn>}
+      {groups.length>0&&<div>
+        <label className="text-xs block mb-1" style={{color:'var(--textSub)'}}>Skupina</label>
+        <select value={fGroup} onChange={e=>{setFGroup(e.target.value);setPage(0)}} className="rounded-lg px-2 py-2 text-sm outline-none" style={{background:'var(--inputBg)',color:'var(--text)'}}>
+          <option value="">Všetky</option>
+          {groups.map(g=><option key={g.id} value={g.id}>📦 {g.name}</option>)}
+        </select>
+      </div>}
+      {(search||fCat||fDiff||fScope||fType||fImg||fGroup)&&<Btn cls="text-xs text-red-400 hover:text-red-300" onClick={()=>{setSearch('');setFCat('');setFDiff('');setFScope('');setFType('');setFImg('');setFGroup('');setPage(0)}}>✕ Zrušiť filtre</Btn>}
     </div>
     <div className="mt-2 text-xs" style={{color:'var(--textSub)'}}>Zobrazených: <b>{filtered.length}</b> z {questions.length}{duplicates.size>0&&<span className="text-yellow-400 ml-2">⚠️ {duplicates.size} potenciálnych duplikátov</span>}</div>
   </Card>
@@ -2423,7 +2634,7 @@ return(
               <td className="px-3 py-2 font-semibold text-green-400">{q.answer}</td>
               <td className="px-3 py-2 text-xs">{CAT_ICONS[q.category]||'❓'} {CAT_LABELS[q.category]||q.category}</td>
               <td className="px-3 py-2 text-center"><span className={`text-xs px-1.5 py-0.5 rounded-full ${q.difficulty==='junior'?'bg-green-500/20 text-green-400':q.difficulty==='level1'?'bg-yellow-500/20 text-yellow-400':'bg-red-500/20 text-red-400'}`}>{q.difficulty==='junior'?'J':q.difficulty==='level1'?'L1':'L2'}</span></td>
-              <td className="px-3 py-2 text-center text-xs">{q.scope==='sk'?'🇸🇰':'🌍'}</td>
+              <td className="px-3 py-2 text-center text-xs">{q.group?'📦':q.scope==='sk'?'🇸🇰':'🌍'}</td>
               <td className="px-3 py-2 text-center">
                 <button onClick={()=>{setEditQ({...q});setShowModal(true)}} className="text-blue-400 hover:text-blue-300 mr-2" title="Upraviť">✏️</button>
                 <button onClick={()=>deleteQ(q.id)} className="text-red-400 hover:text-red-300" title="Odstrániť">🗑️</button>
@@ -2455,32 +2666,55 @@ return(
   </div>
 
   {/* Add/Edit Modal */}
-  {showModal&&<QEditModal q={editQ} onSave={saveQ} onClose={()=>{setShowModal(false);setEditQ(null)}} allCats={allCats}/>}
+  {showModal&&<QEditModal q={editQ} onSave={saveQ} onClose={()=>{setShowModal(false);setEditQ(null)}} allCats={allCats} groups={groups}/>}
+
+  </div>)}
 </div>
 );
 }
 
 /* ── Question Edit Modal ── */
-function QEditModal({q,onSave,onClose,allCats}){
+function QEditModal({q,onSave,onClose,allCats,groups}){
 const isNew=!q||!q.id;
+const _groups=groups||loadGroups();
 const[form,setForm]=useState({
   question:q?.question||'',answer:q?.answer||'',
   category:q?.category||'zaujimavosti_sk',difficulty:q?.difficulty||'level1',
   scope:q?.scope||'sk',type:q?.type||'normal',img:q?.img||'',
+  group:q?.group||null,
 });
 const set=(k,v)=>setForm(f=>({...f,[k]:v}));
 const valid=form.question.trim()&&form.answer.trim();
 const submit=(e)=>{e.preventDefault();if(!valid)return;
   const out={...form,question:form.question.trim(),answer:form.answer.trim()};
   if(!out.img)delete out.img;
+  if(!out.group){delete out.group;if(out.scope==='group')out.scope='sk';}
+  else{out.scope='group';}
   onSave(out);
 };
+const isGroupQ=!!form.group;
+const selGrp=_groups.find(g=>g.id===form.group);
 /* Available categories based on scope */
-const scopeCats=(form.scope==='sk'?SK_CATS:SVET_CATS);
+const scopeCats=isGroupQ?(selGrp?.cats||[]).map(c=>c.key):(form.scope==='sk'?SK_CATS:SVET_CATS);
 return(
 <div className="fixed inset-0 z-40 flex items-center justify-center p-4" style={{background:'rgba(0,0,0,0.7)'}}>
   <form onSubmit={submit} className="w-full max-w-lg rounded-2xl p-6 border shadow-2xl" style={{background:'var(--bg)',borderColor:'var(--border)',maxHeight:'90vh',overflowY:'auto'}}>
     <h3 className="text-xl font-bold mb-4">{isNew?'➕ Nová otázka':'✏️ Upraviť otázku'}{!isNew&&<span className="text-sm font-mono ml-2" style={{color:'var(--textSub)'}}>#{q.id}</span>}</h3>
+
+    {/* Group assignment */}
+    {_groups.length>0&&(
+    <div className="mb-3 p-3 rounded-xl border" style={{borderColor:isGroupQ?'rgb(147 51 234 / .5)':'var(--border)',background:isGroupQ?'rgb(147 51 234 / .1)':'transparent'}}>
+      <label className="block text-xs mb-1 font-semibold" style={{color:'var(--textSub)'}}>📦 Skupina (voliteľné)</label>
+      <select value={form.group||''} onChange={e=>{
+        const gid=e.target.value?+e.target.value:null;
+        set('group',gid);
+        if(gid){set('scope','group');const g=_groups.find(x=>x.id===gid);if(g&&g.cats.length&&!g.cats.some(c=>c.key===form.category))set('category',g.cats[0].key)}
+        else{set('scope','sk')}
+      }} className="w-full rounded-xl px-3 py-2 outline-none text-sm" style={{background:'var(--inputBg)',color:'var(--text)'}}>
+        <option value="">— Bez skupiny (SK/Svet) —</option>
+        {_groups.map(g=><option key={g.id} value={g.id}>📦 {g.name}</option>)}
+      </select>
+    </div>)}
 
     <label className="block text-xs mb-1 font-semibold" style={{color:'var(--textSub)'}}>Otázka *</label>
     <textarea value={form.question} onChange={e=>set('question',e.target.value)} rows="3"
@@ -2492,11 +2726,19 @@ return(
 
     <div className="grid grid-cols-2 gap-3 mb-3">
       <div>
-        <label className="block text-xs mb-1 font-semibold" style={{color:'var(--textSub)'}}>Rozsah</label>
-        <select value={form.scope} onChange={e=>{set('scope',e.target.value);if(!scopeCats.includes(form.category))set('category',e.target.value==='sk'?'zaujimavosti_sk':'zaujimavosti_svet')}}
-          className="w-full rounded-xl px-3 py-2 outline-none text-sm" style={{background:'var(--inputBg)',color:'var(--text)'}}>
-          <option value="sk">🇸🇰 Slovensko</option><option value="svet">🌍 Svet</option>
-        </select>
+        <label className="block text-xs mb-1 font-semibold" style={{color:'var(--textSub)'}}>{isGroupQ?'Téma skupiny':'Rozsah'}</label>
+        {isGroupQ?(
+          <select value={form.category} onChange={e=>set('category',e.target.value)}
+            className="w-full rounded-xl px-3 py-2 outline-none text-sm" style={{background:'var(--inputBg)',color:'var(--text)'}}>
+            {scopeCats.map(c=><option key={c} value={c}>{CAT_ICONS[c]||'📦'} {CAT_LABELS[c]||c}</option>)}
+            {scopeCats.length===0&&<option value="">— Najprv pridaj tému —</option>}
+          </select>
+        ):(
+          <select value={form.scope} onChange={e=>{set('scope',e.target.value);if(!scopeCats.includes(form.category))set('category',e.target.value==='sk'?'zaujimavosti_sk':'zaujimavosti_svet')}}
+            className="w-full rounded-xl px-3 py-2 outline-none text-sm" style={{background:'var(--inputBg)',color:'var(--text)'}}>
+            <option value="sk">🇸🇰 Slovensko</option><option value="svet">🌍 Svet</option>
+          </select>
+        )}
       </div>
       <div>
         <label className="block text-xs mb-1 font-semibold" style={{color:'var(--textSub)'}}>Obtiažnosť</label>
@@ -2507,7 +2749,7 @@ return(
       </div>
     </div>
 
-    <div className="grid grid-cols-2 gap-3 mb-3">
+    {!isGroupQ&&<div className="grid grid-cols-2 gap-3 mb-3">
       <div>
         <label className="block text-xs mb-1 font-semibold" style={{color:'var(--textSub)'}}>Kategória</label>
         <select value={form.category} onChange={e=>set('category',e.target.value)}
@@ -2523,7 +2765,15 @@ return(
           <option value="normal">Normálna</option><option value="tiebreaker">⚡ Rozstrel</option>
         </select>
       </div>
-    </div>
+    </div>}
+
+    {isGroupQ&&<div className="mb-3">
+      <label className="block text-xs mb-1 font-semibold" style={{color:'var(--textSub)'}}>Typ</label>
+      <select value={form.type} onChange={e=>set('type',e.target.value)}
+        className="w-full rounded-xl px-3 py-2 outline-none text-sm" style={{background:'var(--inputBg)',color:'var(--text)'}}>
+        <option value="normal">Normálna</option><option value="tiebreaker">⚡ Rozstrel</option>
+      </select>
+    </div>}
 
     <label className="block text-xs mb-1 font-semibold" style={{color:'var(--textSub)'}}>Obrázok URL (voliteľné)</label>
     <input value={form.img} onChange={e=>set('img',e.target.value)} placeholder="https://..."
