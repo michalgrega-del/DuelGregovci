@@ -3,7 +3,7 @@
    Cache-first s network fallback, auto-update
    ══════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'quiz-2026-v5';
+const CACHE_NAME = 'quiz-2026-v6';
 const LOCAL_ASSETS = [
   './',
   './moderator.html',

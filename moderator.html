@@ -18,7 +18,7 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="questions.js?v=20260303b"></script>
+<script src="questions.js?v=20260304a"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 body{font-family:'Inter',system-ui,sans-serif;margin:0;transition:background .3s,color .3s}
@@ -157,9 +157,9 @@ const R2_PTS=[10,20,30,40,50];
 const R3_PTS=Array.from({length:36},(_,i)=>i*10);
 const R1_TIME=90;
 const R1_MAX_Q=10;
-const R2_TIMER=10;
-const R2_COUNT=10;
-const R3_COUNT=20;
+const R2_TIMER_DEFAULT=10;
+const R2_COUNT_DEFAULT=10;
+const R3_COUNT_DEFAULT=20;
 const R3_Q_PER_CAT=2; /* 2 otázky na kategóriu v 3. kole */
 const SK_CATS=['dejiny_sk','geografia_sk','krajske_mesta','prirodoveda_sk','matematika_sk',
     'spz_sk','literatura_sk','slovensky_jazyk','osobnosti_sk','pohoria_sk',
@@ -263,6 +263,29 @@ return{
         const m=[[523,.18],[523,.1],[523,.1],[659,.28],[587,.18],[659,.18],[784,.45]];
         let t=0;m.forEach(([f,d])=>{osc(f,'sine',d+.1,.22,t);osc(f/2,'triangle',d+.1,.1,t);t+=d+.04});
         [523,659,784,1047].forEach(f=>{osc(f,'sine',1.5,.17,t);osc(f/2,'triangle',1.5,.08,t)});
+        /* Applause effect – white noise bursts */
+        this.applause(.8,t+.3);
+    },
+    applause(dur=1.5,delay=0){if(!this.enabled)return;
+        const x=i(),buf=x.createBuffer(1,x.sampleRate*dur,x.sampleRate),d=buf.getChannelData(0);
+        for(let j=0;j<d.length;j++)d[j]=(Math.random()*2-1)*(.15+.1*Math.sin(j/800));
+        const src=x.createBufferSource(),g=x.createGain(),f=x.createBiquadFilter();
+        src.buffer=buf;f.type='bandpass';f.frequency.value=3000;f.Q.value=.5;
+        src.connect(f);f.connect(g);g.connect(x.destination);
+        g.gain.setValueAtTime(0,x.currentTime+delay);
+        g.gain.linearRampToValueAtTime(.18,x.currentTime+delay+.1);
+        g.gain.setValueAtTime(.18,x.currentTime+delay+dur-.3);
+        g.gain.linearRampToValueAtTime(0,x.currentTime+delay+dur);
+        src.start(x.currentTime+delay);src.stop(x.currentTime+delay+dur);
+    },
+    drumRoll(dur=1.5){if(!this.enabled)return;
+        const x=i(),steps=Math.floor(dur*20);
+        for(let j=0;j<steps;j++){
+            const t=j/20,vol=.06+.1*(j/steps);
+            osc(80+Math.random()*40,'triangle',.05,vol,t);
+        }
+        /* Final hit */
+        osc(60,'triangle',.3,.25,dur);osc(120,'sine',.2,.15,dur);
     },
 };
 })();
@@ -360,7 +383,7 @@ else document.body.classList.remove('light');
 /* ═══════════════ REDUCER ═══════════════ */
 const init={
 screen:'home',players:S.g('players',[]),history:S.g('history',[]),
-settings:S.g('settings',{timer:15,sound:true,r2count:10,r3count:20,theme:'dark'}),
+settings:S.g('settings',{timer:10,sound:true,r2count:10,r3count:20,theme:'dark'}),
 testMode:false,
 gameDate:new Date().toISOString().slice(0,10),p1:null,p2:null,diff:'junior',scope:'sk',voiceGender:'male',
 round:1,qNum:0,curQ:null,usedIds:new Set(),
@@ -377,12 +400,14 @@ passing:false, /* "odpoveď super" – opponent answering */
 originalActive:1, /* who originally had the question */
 tbWinner:null, /* víťaz rozstrelu pred zobrazením výsledkov */
 feedback:null, /* 'correct' | 'wrong' | null – TV feedback overlay */
+_undoStack:[], /* stack of {s1,s2,stats,answered,active,passing,feedback} snapshots for undo */
 stats:{r1:{p1c:0,p1w:0,p2c:0,p2w:0},r2:{p1c:0,p1w:0,p2c:0,p2w:0},r3:{p1c:0,p1w:0,p2c:0,p2w:0}},
 };
 
 function reducer(st,a){
-const r2c=R2_COUNT;
-const r3c=R3_COUNT;
+const r2c=st.settings?.r2count||R2_COUNT_DEFAULT;
+const r3c=st.settings?.r3count||R3_COUNT_DEFAULT;
+const R2_TIMER=st.settings?.timer||R2_TIMER_DEFAULT;
 switch(a.type){
 case 'NAV':return{...st,screen:a.to};
 case 'SET_TEST':return{...st,testMode:a.v};
@@ -439,28 +464,45 @@ case 'REVEAL':return{...st,revealed:true};
 
 /* ── CORRECT ── */
 case 'CORRECT':{
+const snap={s1:st.s1,s2:st.s2,stats:JSON.parse(JSON.stringify(st.stats)),answered:st.answered,active:st.active,passing:st.passing,feedback:st.feedback,revealed:st.revealed};
 const p=st.active;
 const rk=st.round===1?'r1':st.round===2?'r2':'r3';
 const sk=p===1?'p1c':'p2c';
 const newStats={...st.stats,[rk]:{...st.stats[rk],[sk]:st.stats[rk][sk]+1}};
 if(st.round===1){
-    return{...st,s1:p===1?st.s1+10:st.s1,s2:p===2?st.s2+10:st.s2,answered:true,stats:newStats}
+    return{...st,s1:p===1?st.s1+10:st.s1,s2:p===2?st.s2+10:st.s2,answered:true,stats:newStats,_undoStack:[...st._undoStack,snap].slice(-10)}
 }
 const pv=st.pts;
-return{...st,s1:p===1?st.s1+pv:st.s1,s2:p===2?st.s2+pv:st.s2,answered:true,tRun:false,passing:false,stats:newStats,feedback:'correct',revealed:true}
+return{...st,s1:p===1?st.s1+pv:st.s1,s2:p===2?st.s2+pv:st.s2,answered:true,tRun:false,passing:false,stats:newStats,feedback:'correct',revealed:true,_undoStack:[...st._undoStack,snap].slice(-10)}
 }
 
 /* ── WRONG ── */
 case 'WRONG':{
+const snap={s1:st.s1,s2:st.s2,stats:JSON.parse(JSON.stringify(st.stats)),answered:st.answered,active:st.active,passing:st.passing,feedback:st.feedback,revealed:st.revealed};
 const p=st.active;
 const rk=st.round===1?'r1':st.round===2?'r2':'r3';
 const sk=p===1?'p1w':'p2w';
 const newStats={...st.stats,[rk]:{...st.stats[rk],[sk]:st.stats[rk][sk]+1}};
 if(st.round===1){
-    return{...st,answered:true,stats:newStats}
+    return{...st,answered:true,stats:newStats,_undoStack:[...st._undoStack,snap].slice(-10)}
 }
 const pv=st.pts;
-return{...st,s1:p===1?st.s1-pv:st.s1,s2:p===2?st.s2-pv:st.s2,answered:true,tRun:false,passing:false,stats:newStats,feedback:'wrong',revealed:true}
+return{...st,s1:p===1?st.s1-pv:st.s1,s2:p===2?st.s2-pv:st.s2,answered:true,tRun:false,passing:false,stats:newStats,feedback:'wrong',revealed:true,_undoStack:[...st._undoStack,snap].slice(-10)}
+}
+
+/* ── UNDO last CORRECT/WRONG ── */
+case 'UNDO':{
+if(!st._undoStack.length)return st;
+const stack=[...st._undoStack];
+const prev=stack.pop();
+return{...st,...prev,_undoStack:stack}
+}
+
+/* ── Manual score adjustment ── */
+case 'ADJ_SCORE':{
+const delta=a.delta; /* +10 or -10 */
+if(a.p===1)return{...st,s1:st.s1+delta};
+return{...st,s2:st.s2+delta}
 }
 
 /* ── SKIP (R1 "Ďalej" / no points) ── */
@@ -582,9 +624,15 @@ case 'SAVE':{
 const r={id:Date.now(),date:st.gameDate,p1:st.p1,p2:st.p2,s1:st.s1,s2:st.s2,
     diff:st.diff,winner:st.winner===1?st.p1?.name:st.p2?.name,winnerId:st.winner===1?st.p1?.id:st.p2?.id,
     stats:{...st.stats},usedQIds:[...st.usedIds]};
-const h=[...st.history,r];S.s('history',h);return{...st,history:h}}
+const h=[...st.history,r];S.s('history',h);clearSavedGame();return{...st,history:h}}
 case 'END_GAME':
+clearSavedGame();
 return{...st,gameOn:false,over:false,screen:'home',curQ:null,tRun:false,r1tRun:false,testMode:false,showRoundSummary:false,passing:false,feedback:null};
+case 'RESTORE_GAME':{
+const saved=getSavedGame();
+if(!saved)return st;
+return{...st,...saved};
+}
 case 'CLEAR_FEEDBACK':return{...st,feedback:null};
 case 'UPD_SETTINGS':{
 const s={...st.settings,...a.s};S.s('settings',s);SFX.enabled=s.sound;
@@ -638,6 +686,28 @@ default:return st;
 }
 }
 
+/* ═══════════════ GAME SAVE / RESUME ═══════════════ */
+const GAME_SAVE_KEY='duel_game_save';
+function serializeGameState(st){
+  /* Convert Set → Array, strip _undoStack (too big), keep everything else */
+  const o={...st, usedIds:[...st.usedIds], _undoStack:[]};
+  return JSON.stringify(o);
+}
+function deserializeGameState(json){
+  try{
+    const o=JSON.parse(json);
+    o.usedIds=new Set(o.usedIds||[]);
+    o._undoStack=[];
+    /* timers must restart stopped */
+    o.tRun=false;o.r1tRun=false;
+    return o;
+  }catch{return null}
+}
+function getSavedGame(){
+  try{const j=localStorage.getItem(GAME_SAVE_KEY);return j?deserializeGameState(j):null}catch{return null}
+}
+function clearSavedGame(){try{localStorage.removeItem(GAME_SAVE_KEY)}catch{}}
+
 /* ═══════════════ CONTEXT ═══════════════ */
 const Ctx=createContext();
 function Provider({children}){
@@ -674,8 +744,10 @@ useEffect(()=>{
 },[st.tSec,st.tRun,st.round]);
 
 /* Round-end & winner sounds */
-useEffect(()=>{if(st.showRoundSummary)SFX.roundEnd()},[st.showRoundSummary]);
+useEffect(()=>{if(st.showRoundSummary){SFX.roundEnd();SFX.applause(1.2,.6)}},[st.showRoundSummary]);
 useEffect(()=>{if(st.over)SFX.winner()},[st.over]);
+/* Drum roll when tiebreaker starts */
+useEffect(()=>{if(st.round==='tiebreaker'&&st.curQ&&!st.revealed)SFX.drumRoll(2)},[st.round,st.curQ?.id]);
 /* Auto-clear feedback overlay after 2.5s */
 useEffect(()=>{
     if(st.feedback){const t=setTimeout(()=>dp({type:'CLEAR_FEEDBACK'}),2500);return()=>clearTimeout(t)}
@@ -687,10 +759,11 @@ useEffect(()=>{
     if(!st.gameOn&&st.screen!=='results'&&!st.showRoundSummary){
         sendTV('WAITING',{});return;
     }
-    const r2c=R2_COUNT,r3c=R3_COUNT;
+    const r2c=st.settings?.r2count||R2_COUNT_DEFAULT,r3c=st.settings?.r3count||R3_COUNT_DEFAULT;
+    const TIMER=st.settings?.timer||R2_TIMER_DEFAULT;
     const allCats=getCats(st.diff,st.round,st.roundCats,st.scope);
     const availCats=allCats.filter(c=>!st.usedCats.includes(c));
-    const showQOnTV=(st.round===1&&st.r1tRun)||st.tRun||st.answered||st.passing||st.tSec<R2_TIMER;
+    const showQOnTV=(st.round===1&&st.r1tRun)||st.tRun||st.answered||st.passing||st.tSec<TIMER;
     const r3picker=st.round===3?(st.active===1?2:1):st.active;
     const payload={
         screen:st.screen,p1:st.p1,p2:st.p2,s1:st.s1,s2:st.s2,
@@ -700,7 +773,7 @@ useEffect(()=>{
         q:showQOnTV&&st.curQ?{question:st.curQ.question,category:CAT_LABELS[st.curQ.category]||st.curQ.category,
             catKey:st.curQ.category,type:st.curQ.type}:null,
         answer:st.revealed?st.curQ?.answer:null,
-        active:st.active,picker:r3picker,tRun:st.tRun,tSec:st.tSec,tDur:R2_TIMER,
+        active:st.active,picker:r3picker,tRun:st.tRun,tSec:st.tSec,tDur:TIMER,
         pts:st.pts,diff:st.diff,
         over:st.over,winner:st.winner,answered:st.answered,
         r1phase:st.r1phase,r1timer:st.r1timer,r1tRun:st.r1tRun,
@@ -729,6 +802,15 @@ useEffect(()=>{
     S.listen('settings',(val)=>{dp({type:'_CLOUD_SETTINGS',v:val})});
 },[]);
 
+/* ── Auto-save game state to localStorage ── */
+useEffect(()=>{
+    if(st.gameOn&&!st.testMode){
+        try{localStorage.setItem(GAME_SAVE_KEY,serializeGameState(st))}catch(e){console.warn('[Save] Error:',e)}
+    }
+    /* Clear save when game ends */
+    if(!st.gameOn&&st.screen!=='game'){clearSavedGame()}
+},[st.gameOn,st.round,st.qNum,st.s1,st.s2,st.answered,st.active,st.selCat,st.showRoundSummary,st.over,st.screen]);
+
 return <Ctx.Provider value={{st,dp}}>{children}</Ctx.Provider>;
 }
 const use$=()=>useContext(Ctx);
@@ -745,6 +827,7 @@ function HomeScreen(){
 const{st,dp}=use$();
 const[cloudOk,setCloudOk]=useState(false);
 const[syncing,setSyncing]=useState(false);
+const[savedGame,setSavedGame]=useState(()=>getSavedGame());
 useEffect(()=>{
     db.collection('quiz_data').doc('players').get()
       .then(()=>setCloudOk(true))
@@ -759,6 +842,8 @@ const pushToCloud=()=>{
     ]);
     setTimeout(()=>setSyncing(false),1500);
 };
+const resumeGame=()=>{dp({type:'RESTORE_GAME'});setSavedGame(null)};
+const discardSave=()=>{clearSavedGame();setSavedGame(null)};
 return(
 <div className="flex flex-col items-center justify-center min-h-screen gap-6 p-6">
     <div className="anim-float text-center">
@@ -807,6 +892,19 @@ return(
             {syncing?'⏳ Synchronizujem…':'☁️ Sync do cloudu'}
         </button>
     </div>
+    {/* ── Resume saved game banner ── */}
+    {savedGame&&savedGame.gameOn&&(
+    <div className="w-80 rounded-2xl p-4 border border-yellow-500/50 bg-yellow-500/10 mb-2 animate-pulse-slow">
+        <p className="text-yellow-300 font-bold text-center mb-1">💾 Uložená hra</p>
+        <p className="text-sm text-center mb-3" style={{color:'var(--textSub)'}}>
+            {savedGame.p1?.name||'Hráč 1'} vs {savedGame.p2?.name||'Hráč 2'} · Kolo {savedGame.round==='tiebreaker'?'TB':savedGame.round} · {savedGame.s1}:{savedGame.s2}
+        </p>
+        <div className="flex gap-2">
+            <Btn cls="flex-1 bg-gradient-to-r from-green-600 to-green-500 text-white text-sm py-2" onClick={resumeGame}>▶️ Pokračovať</Btn>
+            <Btn cls="flex-1 bg-red-500/20 text-red-400 border border-red-500/30 text-sm py-2" onClick={discardSave}>🗑 Zahodiť</Btn>
+        </div>
+    </div>
+    )}
     <div className="flex flex-col gap-3 w-80">
         <Btn cls="bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 text-lg py-4 shadow-lg shadow-yellow-500/20" onClick={()=>dp({type:'NAV',to:'setup'})}>🎮 Nová hra</Btn>
         <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'players'})}>👤 Hráči</Btn>
@@ -814,7 +912,7 @@ return(
         <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'hist'})}>📋 História</Btn>
         <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'settings'})}>⚙️ Nastavenia</Btn>
     </div>
-    <p className="text-xs mt-4" style={{color:'var(--border)'}}>v2.1-cloud</p>
+    <p className="text-xs mt-4" style={{color:'var(--border)'}}>v2.2-save</p>
 </div>
 );
 }
@@ -1004,7 +1102,8 @@ return(
 function EmbeddedTV(){
 const{st}=use$();
 const isJunior=st.diff==='junior';
-const r2c=R2_COUNT,r3c=R3_COUNT;
+const r2c=st.settings?.r2count||R2_COUNT_DEFAULT,r3c=st.settings?.r3count||R3_COUNT_DEFAULT;
+const TIMER=st.settings?.timer||R2_TIMER_DEFAULT;
 const qNum=st.round===1?st.r1qCount+1:st.qNum+1;
 const qTotal=st.round===1?R1_MAX_Q:st.round===2?r2c:r3c;
 const allCats=getCats(st.diff,st.round,st.roundCats,st.scope);
@@ -1013,7 +1112,7 @@ const embIsR3=st.round===3;
 const embPicker=embIsR3?(st.active===1?2:1):st.active;
 const embPickerName=embPicker===1?st.p1?.name:st.p2?.name;
 const embAnswererName=st.active===1?st.p1?.name:st.p2?.name;
-const embShowQ=(st.round===1&&st.r1tRun)||st.tRun||st.answered||st.passing||st.tSec<R2_TIMER;
+const embShowQ=(st.round===1&&st.r1tRun)||st.tRun||st.answered||st.passing||st.tSec<TIMER;
 
 if(!st.gameOn&&st.screen!=='results'&&!st.showRoundSummary)return(
     <div className={`h-full flex flex-col items-center justify-center ${isJunior?'junior-bg':'standard-bg'}`}>
@@ -1150,7 +1249,7 @@ if((st.round===2||st.round===3)&&!st.selCat)return(
 );
 
 /* Active game (question shown) */
-const timerFrac=R2_TIMER>0?st.tSec/R2_TIMER:1;
+const timerFrac=TIMER>0?st.tSec/TIMER:1;
 const circ=2*Math.PI*42;
 const dashOff=circ*(1-timerFrac);
 const tCol=st.tSec<=3?'#ef4444':st.tSec<=6?'#eab308':'#22c55e';
@@ -1190,7 +1289,7 @@ return(
                     </div>
                 )}
                 {/* R2/R3 timer */}
-                {st.round!==1&&st.round!=='tiebreaker'&&(st.tRun||st.tSec<R2_TIMER)&&(
+                {st.round!==1&&st.round!=='tiebreaker'&&(st.tRun||st.tSec<TIMER)&&(
                     <div className="relative flex items-center justify-center">
                         <svg width="80" height="80" viewBox="0 0 96 96" className={st.tRun&&st.tSec<=3?'anim-pulse':''}>
                             <circle cx="48" cy="48" r="42" fill="none" stroke="#1e293b" strokeWidth="4"/>
@@ -1252,7 +1351,7 @@ const isTB=st.round==='tiebreaker';
 const isR1=st.round===1;
 const isR2=st.round===2;
 const isR3=st.round===3;
-const qTotal=isR1?R1_MAX_Q:isR2?R2_COUNT:R3_COUNT;
+const qTotal=isR1?R1_MAX_Q:isR2?(st.settings?.r2count||R2_COUNT_DEFAULT):(st.settings?.r3count||R3_COUNT_DEFAULT);
 const qDisplay=isR1?st.r1qCount+1:st.qNum+1;
 const availCats=allCats.filter(c=>!st.usedCats.includes(c));
 
@@ -1404,7 +1503,13 @@ else{
                 {isActive&&<span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-lg font-bold">ODPOVEDÁ</span>}
                 {st.passing&&isActive&&<span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-lg font-bold">SUPER</span>}
             </div>
-            <div className={`text-4xl font-black ${score<0?'text-red-400':num===1?'text-p1':'text-p2'}`}>{score}</div>
+            <div className="flex items-center gap-2">
+                <button onClick={()=>dp({type:'ADJ_SCORE',p:num,delta:-10})}
+                    className="w-7 h-7 rounded-lg text-xs font-bold hover:opacity-80 flex items-center justify-center" style={{background:'var(--card2)',color:'var(--textSub)'}}>−</button>
+                <div className={`text-4xl font-black flex-1 text-center ${score<0?'text-red-400':num===1?'text-p1':'text-p2'}`}>{score}</div>
+                <button onClick={()=>dp({type:'ADJ_SCORE',p:num,delta:10})}
+                    className="w-7 h-7 rounded-lg text-xs font-bold hover:opacity-80 flex items-center justify-center" style={{background:'var(--card2)',color:'var(--textSub)'}}>+</button>
+            </div>
             <div className="text-xs" style={{color:'var(--textSub)'}}>bodov</div>
             {isActiveAndR1&&st.r1tRun&&(
                 <div className="flex gap-2 mt-3 flex-wrap">
@@ -1502,7 +1607,7 @@ else{
             )}
             <Btn cls="mt-3 w-full bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 py-3 text-lg"
                 onClick={()=>{setPtsConfirmed(true);dp({type:'CONFIRM_PTS'});TTS.speak(st.curQ?.question)}}>
-                ▶ Potvrdiť a spustiť čas ({R2_TIMER}s)</Btn>
+                ▶ Potvrdiť a spustiť čas ({st.settings?.timer||R2_TIMER_DEFAULT}s)</Btn>
         </Card>
     );
 
@@ -1637,6 +1742,12 @@ else{
                     {playerCard(1,st.p1?.name,st.s1,st.active===1)}
                     {playerCard(2,st.p2?.name,st.s2,st.active===2)}
                 </div>
+                {st._undoStack.length>0&&(
+                    <div className="mt-2 flex justify-center">
+                        <Btn cls="bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 text-sm py-1 px-4"
+                            onClick={()=>dp({type:'UNDO'})}>↩ Vrátiť posledný krok</Btn>
+                    </div>
+                )}
                 {roundSwitcher}
                 {r1Info}
                 {catPicker}
@@ -1841,6 +1952,7 @@ function SettingsScreen(){
 const{st,dp}=use$();
 const[r2c,setR2]=useState(st.settings.r2count||10);
 const[r3c,setR3]=useState(st.settings.r3count||20);
+const[tmr,setTmr]=useState(st.settings.timer||10);
 const isDark=(st.settings.theme||'dark')==='dark';
 return(
 <div className="max-w-lg mx-auto p-6">
@@ -1861,9 +1973,15 @@ return(
             <p className="font-semibold mb-1">Kolo 1 – Rýchla runda</p>
             <p className="text-xs" style={{color:'var(--textSub)'}}>90 sekúnd na hráča · max 10 otázok na hráča · 10 bodov · bez odpočtu</p>
         </div>
-        <div className="rounded-xl p-3 border" style={{background:'var(--card2)',borderColor:'var(--border)'}}>
-            <p className="font-semibold mb-1">Kolo 2 & 3 – Časovač</p>
-            <p className="text-xs" style={{color:'var(--textSub)'}}>10 sekúnd na otázku · automatický štart po výbere stávky</p>
+        <div>
+            <label className="text-sm block mb-2" style={{color:'var(--textSub)'}}>⏱️ Časovač na otázku v 2. a 3. kole (sekundy)</label>
+            <div className="flex gap-2">
+                {[5,10,15,20].map(v=>(
+                    <button key={v} onClick={()=>setTmr(v)}
+                        className={`flex-1 py-3 rounded-xl text-lg font-bold ${tmr===v?'bg-accent text-black shadow-lg shadow-yellow-500/20':''}`}
+                        style={tmr!==v?{background:'var(--card2)'}:{}}>{v}s</button>
+                ))}
+            </div>
         </div>
         <div>
             <label className="text-sm block mb-2" style={{color:'var(--textSub)'}}>Počet otázok v 2. kole (párne, 10–20)</label>
@@ -1885,7 +2003,7 @@ return(
                 ))}
             </div>
         </div>
-        <Btn cls="bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 w-full py-3" onClick={()=>dp({type:'UPD_SETTINGS',s:{r2count:r2c,r3count:r3c}})}>Uložiť nastavenia</Btn>
+        <Btn cls="bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 w-full py-3" onClick={()=>dp({type:'UPD_SETTINGS',s:{r2count:r2c,r3count:r3c,timer:tmr}})}>💾 Uložiť nastavenia</Btn>
         <div className="flex items-center justify-between">
             <span>Zvukové efekty</span>
             <button onClick={()=>dp({type:'UPD_SETTINGS',s:{sound:!st.settings.sound}})}
