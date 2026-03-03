@@ -2586,6 +2586,22 @@ return(
 </div>
 );}
 
+/* ═══════════════ ERROR BOUNDARY ═══════════════ */
+class ErrorBoundary extends React.Component{
+constructor(p){super(p);this.state={err:null}}
+static getDerivedStateFromError(e){return{err:e}}
+render(){
+if(this.state.err)return(
+<div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#0f172a',color:'#fff',fontFamily:'Inter,system-ui,sans-serif'}}>
+<div style={{textAlign:'center',padding:'48px',background:'#1e293b',borderRadius:'24px',maxWidth:'500px',boxShadow:'0 25px 60px rgba(0,0,0,.5)'}}>
+<div style={{fontSize:'64px',marginBottom:'16px'}}>⚠️</div>
+<h2 style={{fontSize:'24px',fontWeight:800,marginBottom:'8px'}}>Nastala chyba</h2>
+<p style={{color:'#94a3b8',marginBottom:'24px',fontSize:'14px',wordBreak:'break-all'}}>{this.state.err.message}</p>
+<button onClick={()=>location.reload()} style={{padding:'14px 32px',borderRadius:'12px',background:'linear-gradient(135deg,#eab308,#f59e0b)',color:'#0f172a',fontSize:'18px',fontWeight:800,border:'none',cursor:'pointer'}}>🔄 Reštartovať</button>
+</div></div>);
+return this.props.children;
+}}
+
 /* ═══════════════ ROOT WITH AUTH GATE ═══════════════ */
 function Root(){
 const[auth,setAuth]=useState(()=>sessionStorage.getItem('quiz_auth')==='1');
