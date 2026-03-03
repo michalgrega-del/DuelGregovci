@@ -18,7 +18,7 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="questions.js?v=20260304a"></script>
+<script src="questions.js?v=20260304b"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 body{font-family:'Inter',system-ui,sans-serif;margin:0;transition:background .3s,color .3s}
@@ -771,7 +771,7 @@ useEffect(()=>{
         qNum:st.round===1?st.r1qCount+1:st.qNum+1,
         qTotal:st.round===1?R1_MAX_Q:st.round===2?r2c:r3c,
         q:showQOnTV&&st.curQ?{question:st.curQ.question,category:CAT_LABELS[st.curQ.category]||st.curQ.category,
-            catKey:st.curQ.category,type:st.curQ.type}:null,
+            catKey:st.curQ.category,type:st.curQ.type,img:st.curQ.img||null}:null,
         answer:st.revealed?st.curQ?.answer:null,
         active:st.active,picker:r3picker,tRun:st.tRun,tSec:st.tSec,tDur:TIMER,
         pts:st.pts,diff:st.diff,
@@ -781,7 +781,7 @@ useEffect(()=>{
         showRoundSummary:st.showRoundSummary,summaryRound:st.summaryRound,
         stats:st.stats,categories:availCats,usedCats:st.usedCats,catQCounts:st.catQCounts||{},
         passing:st.passing,originalActive:st.originalActive,
-        tb1:st.tb1,tb2:st.tb2,tbWinner:st.tbWinner,tbQ:st.round==='tiebreaker'&&st.curQ?{question:st.curQ.question,answer:st.revealed?st.curQ.answer:null}:null,
+        tb1:st.tb1,tb2:st.tb2,tbWinner:st.tbWinner,tbQ:st.round==='tiebreaker'&&st.curQ?{question:st.curQ.question,answer:st.revealed?st.curQ.answer:null,img:st.curQ.img||null}:null,
         theme:st.settings.theme||'dark',
         feedback:st.feedback,
         scope:st.scope||'sk',
@@ -1200,6 +1200,7 @@ if(st.round==='tiebreaker'&&st.curQ){
             <h2 className="text-2xl font-bold text-accent mb-4">⚡ Rozstrel</h2>
             <div className="bg-black/40 border border-accent/20 rounded-2xl p-6 mb-4">
                 <p className="text-2xl font-bold">{st.curQ.question}</p>
+                {st.curQ.img&&<div className="mt-3 flex justify-center"><img src={st.curQ.img} alt="" className="max-h-36 rounded-xl" style={{objectFit:'contain'}}/></div>}
             </div>
             {st.revealed&&<p className="text-green-400 font-bold text-lg">Správna odpoveď: {st.curQ.answer}</p>}
         </div>
@@ -1309,6 +1310,7 @@ return(
                         </span>
                         <div className={`bg-black/40 border ${isJunior?'border-purple-500/30':'border-accent/20'} rounded-2xl p-6`}>
                             <p className="font-bold text-3xl leading-relaxed">{st.curQ.question}</p>
+                            {st.curQ.img&&<div className="mt-4 flex justify-center"><img src={st.curQ.img} alt="" className="max-h-40 rounded-xl" style={{objectFit:'contain'}}/></div>}
                         </div>
                     </div>
                 ):<div className="text-slate-600 text-base">Čakám na otázku…</div>}
@@ -1622,6 +1624,7 @@ else{
                 {(isR2||isR3)&&<span className="text-accent font-black text-xl">{st.pts} b</span>}
             </div>
             <p className="text-xl font-semibold mb-4 leading-relaxed">{st.curQ.question}</p>
+            {st.curQ.img&&<div className="mb-4 flex justify-center"><img src={st.curQ.img} alt="" className="max-h-48 rounded-xl shadow-lg border border-white/10" style={{objectFit:'contain'}}/></div>}
             <div className="rounded-xl p-3 mb-3" style={{background:'var(--card2)'}}>
                 <p className="text-ok font-bold text-xl">✓ {st.curQ.answer}</p>
             </div>
@@ -1665,6 +1668,7 @@ else{
             <div className="rounded-xl p-4 border" style={{background:'var(--card2)',borderColor:'var(--border)'}}>
                 <p className="text-xs mb-1" style={{color:'var(--textSub)'}}>{CAT_LABELS[st.curQ?.category]||st.curQ?.category}</p>
                 <p className="text-xl font-bold">{st.curQ?.question}</p>
+                {st.curQ?.img&&<div className="mt-3 flex justify-center"><img src={st.curQ.img} alt="" className="max-h-40 rounded-xl border border-white/10" style={{objectFit:'contain'}}/></div>}
             </div>
             {/* Správna odpoveď pre moderátora – vždy viditeľná */}
             <div className="rounded-xl p-3 border border-ok/30" style={{background:'var(--card2)'}}>
