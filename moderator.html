@@ -500,7 +500,7 @@ return{...st,screen:'game',gameOn:true,over:false,
 /* ── START GAME at Round 2 ── */
 case 'START_GAME_R2':{
 const u=new Set(getRecentUsedIds());
-const rc2=pickRoundCats(st.diff||'junior',st.scope||'sk',10);
+const rc2=pickRoundCats(st.diff||'junior',st.scope||'sk',st.settings?.r2count||R2_COUNT_DEFAULT);
 return{...st,screen:'game',gameOn:true,over:false,
     round:2,qNum:0,curQ:null,usedIds:u,
     s1:0,s2:0,active:1,originalActive:1,tRun:false,tSec:R2_TIMER,
@@ -655,12 +655,12 @@ if(st.summaryRound>=_tr||st.summaryRound===3){
     return{...st,over:true,gameOn:false,winner:w,screen:'results',showRoundSummary:false,summaryRound:null}
 }
 if(st.summaryRound===1){
-    const rc2=pickRoundCats(st.diff,st.scope,10);
+    const rc2=pickRoundCats(st.diff,st.scope,st.settings?.r2count||R2_COUNT_DEFAULT);
     return{...st,round:2,qNum:0,curQ:null,active:1,originalActive:1,showRoundSummary:false,summaryRound:null,
         tRun:false,tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,usedCats:[],roundCats:rc2,catQCounts:{},passing:false}
 }
 if(st.summaryRound===2){
-    const rc3=pickRoundCats(st.diff,st.scope,10);
+    const rc3=pickRoundCats(st.diff,st.scope,(st.settings?.r3count||R3_COUNT_DEFAULT)/R3_Q_PER_CAT);
     return{...st,round:3,qNum:0,curQ:null,active:2,originalActive:2,showRoundSummary:false,summaryRound:null,
         tRun:false,tSec:R2_TIMER,revealed:false,answered:false,selCat:null,pts:10,usedCats:[],roundCats:rc3,catQCounts:{},passing:false}
 }
@@ -724,11 +724,11 @@ if(target===1){
         r1phase:1,r1qCount:0,r1timer:R1_TIME,roundCats:[]}
 }
 if(target===2){
-    const rc2=pickRoundCats(st.diff,st.scope,10);
+    const rc2=pickRoundCats(st.diff,st.scope,st.settings?.r2count||R2_COUNT_DEFAULT);
     return{...base,round:2,qNum:0,curQ:null,active:1,originalActive:1,r1phase:2,r1qCount:0,r1timer:0,roundCats:rc2}
 }
 if(target===3){
-    const rc3=pickRoundCats(st.diff,st.scope,10);
+    const rc3=pickRoundCats(st.diff,st.scope,(st.settings?.r3count||R3_COUNT_DEFAULT)/R3_Q_PER_CAT);
     return{...base,round:3,qNum:0,curQ:null,active:2,originalActive:2,r1phase:2,r1qCount:0,r1timer:0,roundCats:rc3}
 }
 if(target==='tiebreaker'){
