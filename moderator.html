@@ -18,7 +18,8 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="questions.js?v=20260305a"></script>
+<script src="constants.js?v=20260615a"></script>
+<script src="questions.js?v=20260615a"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 body{font-family:'Inter',system-ui,sans-serif;margin:0;transition:background .3s,color .3s}
@@ -92,84 +93,13 @@ const QUESTIONS_DB = window.QUESTIONS_DB;
 if(!QUESTIONS_DB||!QUESTIONS_DB.length){console.error('[BABEL] QUESTIONS_DB not available!');}
 const{useState,useReducer,useContext,createContext,useEffect,useRef,useCallback,useMemo}=React;
 
-/* ─── CONSTANTS ─── */
-const ROUND_NAMES={1:'Rýchla runda',2:'Hlavná runda',3:'Finálová runda',tiebreaker:'Rozstrel'};
-const DIFF_LABELS={junior:'Junior (7–12)',level1:'Level 1 (13–18)',level2:'Level 2 (18–99)'};
-const CAT_LABELS={
-/* SK */
-dejiny_sk:'Dejiny',geografia_sk:'Geografia',krajske_mesta:'Krajské mestá',prirodoveda_sk:'Prírodoveda',
-matematika_sk:'Matematika',spz_sk:'Slovenské ŠPZ',literatura_sk:'Literatúra',slovensky_jazyk:'Slovenský jazyk',
-osobnosti_sk:'Osobnosti',pohoria_sk:'Pohoria',informatika_sk:'Informatika',spisovatelia_sk:'Spisovatelia',
-sport_sk:'Šport',prislovia_sk:'Príslovia',zvierata_sk:'Zvieratá',hrady_zamky:'Hrady a zámky',
-rieky_sk:'Rieky Slovenska',vlajky_erby_sk:'Erby a vlajky',pravopis_sk:'Pravopis',
-veda_technika_sk:'Veda a technika',nabozenstvo_sk:'Náboženstvo',divadlo_sk:'Divadlo a film',
-pocasie_sk:'Počasie a príroda',skauting_sk:'Skauting',zaujimavosti_sk:'Zaujímavosti',
-/* SVET */
-dejiny_svet:'Dejiny sveta',geografia_svet:'Geografia 🌍',hlavne_mesta:'Hlavné mestá',sport_svet:'Šport 🌍',
-opera_svet:'Opera a hudba',divadlo_svet:'Divadlo 🌍',vlajky_svet:'Vlajky štátov',umenie_svet:'Umenie',
-veda_technika_svet:'Veda a technika 🌍',literatura_svet:'Literatúra 🌍',hudba_svet:'Hudba',film_svet:'Film',
-matematika_svet:'Matematika 🌍',osobnosti_svet:'Osobnosti 🌍',priroda_svet:'Príroda 🌍',
-informatika_svet:'Informatika 🌍',astronomia:'Vesmír',zaujimavosti_svet:'Zaujímavosti 🌍',
-olympijske_hry:'Olympijské hry',kulinarka:'Kuchyne sveta',
-};
-const CAT_ICONS={
-dejiny_sk:'📜',geografia_sk:'🗺️',krajske_mesta:'🏙️',prirodoveda_sk:'🌱',matematika_sk:'🔢',
-spz_sk:'🚗',literatura_sk:'📚',slovensky_jazyk:'🗣️',osobnosti_sk:'👤',pohoria_sk:'⛰️',
-informatika_sk:'💻',spisovatelia_sk:'✒️',sport_sk:'⚽',prislovia_sk:'💬',zvierata_sk:'🦊',
-hrady_zamky:'🏰',rieky_sk:'🌊',vlajky_erby_sk:'🏛️',pravopis_sk:'✍️',veda_technika_sk:'🔬',
-nabozenstvo_sk:'⛪',divadlo_sk:'🎭',pocasie_sk:'🌤️',skauting_sk:'⚜️',zaujimavosti_sk:'💡',
-dejiny_svet:'📜',geografia_svet:'🌍',hlavne_mesta:'🏛️',sport_svet:'🏆',opera_svet:'🎶',
-divadlo_svet:'🎭',vlajky_svet:'🏳️',umenie_svet:'🎨',veda_technika_svet:'🔬',literatura_svet:'📖',
-hudba_svet:'🎵',film_svet:'🎬',matematika_svet:'🔢',osobnosti_svet:'👤',priroda_svet:'🌿',
-informatika_svet:'💻',astronomia:'🚀',zaujimavosti_svet:'💡',olympijske_hry:'🏅',kulinarka:'🍽️',
-};
-const CAT_COLORS={
-dejiny_sk:'from-amber-500/20 to-amber-600/5 border-amber-500/50',
-geografia_sk:'from-emerald-500/20 to-emerald-600/5 border-emerald-500/50',
-krajske_mesta:'from-indigo-500/20 to-indigo-600/5 border-indigo-500/50',
-prirodoveda_sk:'from-lime-500/20 to-lime-600/5 border-lime-500/50',
-matematika_sk:'from-blue-500/20 to-blue-600/5 border-blue-500/50',
-spz_sk:'from-slate-500/20 to-slate-600/5 border-slate-500/50',
-literatura_sk:'from-rose-500/20 to-rose-600/5 border-rose-500/50',
-slovensky_jazyk:'from-fuchsia-500/20 to-fuchsia-600/5 border-fuchsia-500/50',
-osobnosti_sk:'from-cyan-500/20 to-cyan-600/5 border-cyan-500/50',
-pohoria_sk:'from-teal-500/20 to-teal-600/5 border-teal-500/50',
-informatika_sk:'from-violet-500/20 to-violet-600/5 border-violet-500/50',
-spisovatelia_sk:'from-pink-500/20 to-pink-600/5 border-pink-500/50',
-sport_sk:'from-green-500/20 to-green-600/5 border-green-500/50',
-prislovia_sk:'from-yellow-500/20 to-yellow-600/5 border-yellow-500/50',
-zvierata_sk:'from-orange-500/20 to-orange-600/5 border-orange-500/50',
-hrady_zamky:'from-stone-500/20 to-stone-600/5 border-stone-500/50',
-rieky_sk:'from-sky-500/20 to-sky-600/5 border-sky-500/50',
-vlajky_erby_sk:'from-red-500/20 to-red-600/5 border-red-500/50',
-pravopis_sk:'from-purple-500/20 to-purple-600/5 border-purple-500/50',
-veda_technika_sk:'from-cyan-500/20 to-cyan-600/5 border-cyan-500/50',
-nabozenstvo_sk:'from-amber-500/20 to-amber-600/5 border-amber-500/50',
-divadlo_sk:'from-purple-500/20 to-purple-600/5 border-purple-500/50',
-pocasie_sk:'from-sky-500/20 to-sky-600/5 border-sky-500/50',
-skauting_sk:'from-emerald-500/20 to-emerald-600/5 border-emerald-500/50',
-zaujimavosti_sk:'from-yellow-500/20 to-yellow-600/5 border-yellow-500/50',
-dejiny_svet:'from-amber-500/20 to-amber-600/5 border-amber-500/50',
-geografia_svet:'from-emerald-500/20 to-emerald-600/5 border-emerald-500/50',
-hlavne_mesta:'from-indigo-500/20 to-indigo-600/5 border-indigo-500/50',
-sport_svet:'from-green-500/20 to-green-600/5 border-green-500/50',
-opera_svet:'from-rose-500/20 to-rose-600/5 border-rose-500/50',
-divadlo_svet:'from-purple-500/20 to-purple-600/5 border-purple-500/50',
-vlajky_svet:'from-red-500/20 to-red-600/5 border-red-500/50',
-umenie_svet:'from-fuchsia-500/20 to-fuchsia-600/5 border-fuchsia-500/50',
-veda_technika_svet:'from-cyan-500/20 to-cyan-600/5 border-cyan-500/50',
-literatura_svet:'from-pink-500/20 to-pink-600/5 border-pink-500/50',
-hudba_svet:'from-violet-500/20 to-violet-600/5 border-violet-500/50',
-film_svet:'from-red-500/20 to-red-600/5 border-red-500/50',
-matematika_svet:'from-blue-500/20 to-blue-600/5 border-blue-500/50',
-osobnosti_svet:'from-teal-500/20 to-teal-600/5 border-teal-500/50',
-priroda_svet:'from-lime-500/20 to-lime-600/5 border-lime-500/50',
-informatika_svet:'from-violet-500/20 to-violet-600/5 border-violet-500/50',
-astronomia:'from-slate-500/20 to-slate-600/5 border-slate-500/50',
-zaujimavosti_svet:'from-yellow-500/20 to-yellow-600/5 border-yellow-500/50',
-olympijske_hry:'from-orange-500/20 to-orange-600/5 border-orange-500/50',
-kulinarka:'from-stone-500/20 to-stone-600/5 border-stone-500/50',
-};
+/* ─── CONSTANTS (from shared constants.js) ─── */
+const _C = window.QUIZ_CONSTANTS;
+const ROUND_NAMES = _C.ROUND_NAMES;
+const DIFF_LABELS = _C.DIFF_LABELS;
+const CAT_LABELS = {..._C.CAT_LABELS};
+const CAT_ICONS = {..._C.CAT_ICONS};
+const CAT_COLORS = {..._C.CAT_COLORS};
 
 /* ─── CUSTOM GROUPS ─── */
 const GRP_COLORS=['from-teal-500/20 to-teal-600/5 border-teal-500/50','from-rose-500/20 to-rose-600/5 border-rose-500/50','from-indigo-500/20 to-indigo-600/5 border-indigo-500/50','from-amber-500/20 to-amber-600/5 border-amber-500/50','from-fuchsia-500/20 to-fuchsia-600/5 border-fuchsia-500/50','from-cyan-500/20 to-cyan-600/5 border-cyan-500/50','from-lime-500/20 to-lime-600/5 border-lime-500/50','from-orange-500/20 to-orange-600/5 border-orange-500/50'];
@@ -185,23 +115,21 @@ function registerGroupCats(groups){
 const _initGroups=loadGroups();
 registerGroupCats(_initGroups);
 
-const R2_PTS=[10,20,30,40,50];
-const R3_PTS=Array.from({length:36},(_,i)=>i*10);
-const R1_TIME=90;
-const R1_MAX_Q=10;
-const R2_TIMER_DEFAULT=10;
-const R2_COUNT_DEFAULT=10;
-const R3_COUNT_DEFAULT=20;
-const R3_Q_PER_CAT=2; /* 2 otázky na kategóriu v 3. kole */
-const SK_CATS=['dejiny_sk','geografia_sk','krajske_mesta','prirodoveda_sk','matematika_sk',
-    'spz_sk','literatura_sk','slovensky_jazyk','osobnosti_sk','pohoria_sk',
-    'informatika_sk','spisovatelia_sk','sport_sk','prislovia_sk','zvierata_sk',
-    'hrady_zamky','rieky_sk','vlajky_erby_sk','pravopis_sk','veda_technika_sk',
-    'nabozenstvo_sk','divadlo_sk','pocasie_sk','skauting_sk','zaujimavosti_sk'];
-const SVET_CATS=['dejiny_svet','geografia_svet','hlavne_mesta','sport_svet','opera_svet',
-    'divadlo_svet','vlajky_svet','umenie_svet','veda_technika_svet','literatura_svet',
-    'hudba_svet','film_svet','matematika_svet','osobnosti_svet','priroda_svet',
-    'informatika_svet','astronomia','zaujimavosti_svet','olympijske_hry','kulinarka'];
+const R2_PTS=_C.R2_PTS;
+const R3_PTS=_C.R3_PTS;
+const R1_TIME=_C.R1_TIME;
+const R1_MAX_Q=_C.R1_MAX_Q;
+const R2_TIMER_DEFAULT=_C.R2_TIMER_DEFAULT;
+const R2_COUNT_DEFAULT=_C.R2_COUNT_DEFAULT;
+const R3_COUNT_DEFAULT=_C.R3_COUNT_DEFAULT;
+const R3_Q_PER_CAT=_C.R3_Q_PER_CAT;
+const STREAK_THRESHOLD=_C.STREAK_THRESHOLD;
+const STREAK_BONUS=_C.STREAK_BONUS;
+const BLITZ_TIME=_C.BLITZ_TIME;
+const BLITZ_MAX_Q=_C.BLITZ_MAX_Q;
+const BLITZ_PTS=_C.BLITZ_PTS;
+const SK_CATS=_C.SK_CATS;
+const SVET_CATS=_C.SVET_CATS;
 const SCOPE_CATS={sk:SK_CATS,svet:SVET_CATS};
 function pickRoundCats(diff,scope,n=10){
     let base;
@@ -472,6 +400,16 @@ askedQuestions:[], /* tracked questions for post-game review */
 totalRounds:3, /* configurable: 1, 2, or 3 rounds */
 _undoStack:[], /* stack of {s1,s2,stats,answered,active,passing,feedback} snapshots for undo */
 stats:{r1:{p1c:0,p1w:0,p2c:0,p2w:0},r2:{p1c:0,p1w:0,p2c:0,p2w:0},r3:{p1c:0,p1w:0,p2c:0,p2w:0}},
+/* ── Streak ── */
+streak1:0, streak2:0, maxStreak1:0, maxStreak2:0,
+/* ── Power-ups (each player gets one of each per game) ── */
+powerups1:{doublePoints:1,steal:1,shield:1},
+powerups2:{doublePoints:1,steal:1,shield:1},
+activePowerup:null, /* {type:'doublePoints'|'steal'|'shield', player:1|2} */
+/* ── Blitz mode ── */
+blitzMode:false,
+/* ── Solo practice ── */
+soloMode:false, soloScore:0, soloCorrect:0, soloWrong:0, soloCategory:'',
 };
 
 function reducer(st,a){
@@ -498,7 +436,9 @@ return{...st,screen:'game',gameOn:true,over:false,
     r1phase:1,r1qCount:0,r1timer:R1_TIME,r1tRun:false,
     showRoundSummary:false,summaryRound:null,
     usedCats:[],roundCats:[],catQCounts:{},passing:false,originalActive:1,tbWinner:null,
-    stats:{r1:{p1c:0,p1w:0,p2c:0,p2w:0},r2:{p1c:0,p1w:0,p2c:0,p2w:0},r3:{p1c:0,p1w:0,p2c:0,p2w:0}},askedQuestions:[]}}
+    stats:{r1:{p1c:0,p1w:0,p2c:0,p2w:0},r2:{p1c:0,p1w:0,p2c:0,p2w:0},r3:{p1c:0,p1w:0,p2c:0,p2w:0}},askedQuestions:[],
+    streak1:0,streak2:0,maxStreak1:0,maxStreak2:0,blitzMode:false,
+    powerups1:{doublePoints:1,steal:1,shield:1},powerups2:{doublePoints:1,steal:1,shield:1},activePowerup:null}}
 
 /* ── START GAME at Round 2 ── */
 case 'START_GAME_R2':{
@@ -534,32 +474,58 @@ case 'REVEAL':return{...st,revealed:true};
 
 /* ── CORRECT ── */
 case 'CORRECT':{
-const snap={s1:st.s1,s2:st.s2,stats:JSON.parse(JSON.stringify(st.stats)),answered:st.answered,active:st.active,passing:st.passing,feedback:st.feedback,revealed:st.revealed,askedQuestions:[...st.askedQuestions]};
+const snap={s1:st.s1,s2:st.s2,stats:JSON.parse(JSON.stringify(st.stats)),answered:st.answered,active:st.active,passing:st.passing,feedback:st.feedback,revealed:st.revealed,askedQuestions:[...st.askedQuestions],streak1:st.streak1,streak2:st.streak2,activePowerup:st.activePowerup};
 const p=st.active;
 const rk=st.round===1?'r1':st.round===2?'r2':'r3';
 const sk=p===1?'p1c':'p2c';
 const newStats={...st.stats,[rk]:{...st.stats[rk],[sk]:st.stats[rk][sk]+1}};
-const _aq=[...st.askedQuestions,{q:st.curQ?.question,a:st.curQ?.answer,cat:st.curQ?.category,ok:true,who:p,round:st.round,pts:st.round===1?10:st.pts}];
-if(st.round===1){
-    return{...st,s1:p===1?st.s1+10:st.s1,s2:p===2?st.s2+10:st.s2,answered:true,stats:newStats,askedQuestions:_aq,_undoStack:[...st._undoStack,snap].slice(-10)}
+/* Streak tracking */
+const newStreak1=p===1?st.streak1+1:0;
+const newStreak2=p===2?st.streak2+1:0;
+const curStreak=p===1?newStreak1:newStreak2;
+const streakBonus=curStreak>=STREAK_THRESHOLD?STREAK_BONUS:0;
+/* Power-up bonus */
+const pw=st.activePowerup;
+let ptsMultiplier=1;
+let stealPts=0;
+if(pw&&pw.player===p){
+  if(pw.type==='doublePoints')ptsMultiplier=2;
+  if(pw.type==='steal')stealPts=st.round===1?10:st.pts;
 }
-const pv=st.pts;
-return{...st,s1:p===1?st.s1+pv:st.s1,s2:p===2?st.s2+pv:st.s2,answered:true,tRun:false,passing:false,stats:newStats,feedback:'correct',revealed:true,askedQuestions:_aq,_undoStack:[...st._undoStack,snap].slice(-10)}
+const _aq=[...st.askedQuestions,{q:st.curQ?.question,a:st.curQ?.answer,cat:st.curQ?.category,ok:true,who:p,round:st.round,pts:st.round===1?10:st.pts,streak:curStreak>=STREAK_THRESHOLD}];
+if(st.round===1){
+    const basePts=st.blitzMode?BLITZ_PTS:10;
+    const earned=basePts*ptsMultiplier+streakBonus;
+    return{...st,s1:p===1?st.s1+earned:st.s1-stealPts,s2:p===2?st.s2+earned:st.s2-stealPts,answered:true,stats:newStats,askedQuestions:_aq,
+        streak1:newStreak1,streak2:newStreak2,maxStreak1:Math.max(st.maxStreak1,newStreak1),maxStreak2:Math.max(st.maxStreak2,newStreak2),
+        activePowerup:null,_undoStack:[...st._undoStack,snap].slice(-10)}
+}
+const pv=st.pts*ptsMultiplier+streakBonus;
+return{...st,s1:p===1?st.s1+pv:st.s1-stealPts,s2:p===2?st.s2+pv:st.s2-stealPts,answered:true,tRun:false,passing:false,stats:newStats,feedback:'correct',revealed:true,askedQuestions:_aq,
+    streak1:newStreak1,streak2:newStreak2,maxStreak1:Math.max(st.maxStreak1,newStreak1),maxStreak2:Math.max(st.maxStreak2,newStreak2),
+    activePowerup:null,_undoStack:[...st._undoStack,snap].slice(-10)}
 }
 
 /* ── WRONG ── */
 case 'WRONG':{
-const snap={s1:st.s1,s2:st.s2,stats:JSON.parse(JSON.stringify(st.stats)),answered:st.answered,active:st.active,passing:st.passing,feedback:st.feedback,revealed:st.revealed,askedQuestions:[...st.askedQuestions]};
+const snap={s1:st.s1,s2:st.s2,stats:JSON.parse(JSON.stringify(st.stats)),answered:st.answered,active:st.active,passing:st.passing,feedback:st.feedback,revealed:st.revealed,askedQuestions:[...st.askedQuestions],streak1:st.streak1,streak2:st.streak2,activePowerup:st.activePowerup};
 const p=st.active;
 const rk=st.round===1?'r1':st.round===2?'r2':'r3';
 const sk=p===1?'p1w':'p2w';
 const newStats={...st.stats,[rk]:{...st.stats[rk],[sk]:st.stats[rk][sk]+1}};
+/* Reset streak on wrong */
+const newStreak1=p===1?0:st.streak1;
+const newStreak2=p===2?0:st.streak2;
+/* Shield power-up check */
+const pw=st.activePowerup;
+const shielded=pw&&pw.player===p&&pw.type==='shield';
 const _aq=[...st.askedQuestions,{q:st.curQ?.question,a:st.curQ?.answer,cat:st.curQ?.category,ok:false,who:p,round:st.round,pts:st.round===1?10:st.pts}];
 if(st.round===1){
-    return{...st,answered:true,stats:newStats,askedQuestions:_aq,_undoStack:[...st._undoStack,snap].slice(-10)}
+    return{...st,answered:true,stats:newStats,askedQuestions:_aq,streak1:newStreak1,streak2:newStreak2,activePowerup:null,_undoStack:[...st._undoStack,snap].slice(-10)}
 }
-const pv=st.pts;
-return{...st,s1:p===1?st.s1-pv:st.s1,s2:p===2?st.s2-pv:st.s2,answered:true,tRun:false,passing:false,stats:newStats,feedback:'wrong',revealed:true,askedQuestions:_aq,_undoStack:[...st._undoStack,snap].slice(-10)}
+const pv=shielded?0:st.pts;
+return{...st,s1:p===1?st.s1-pv:st.s1,s2:p===2?st.s2-pv:st.s2,answered:true,tRun:false,passing:false,stats:newStats,feedback:'wrong',revealed:true,askedQuestions:_aq,
+    streak1:newStreak1,streak2:newStreak2,activePowerup:null,_undoStack:[...st._undoStack,snap].slice(-10)}
 }
 
 /* ── UNDO last CORRECT/WRONG ── */
@@ -756,6 +722,55 @@ case '_CLOUD_SETTINGS':{
     return{...st,settings:s};
 }
 
+/* ── Power-up activation ── */
+case 'USE_POWERUP':{
+    const p=a.player; /* 1 or 2 */
+    const pu=a.powerup; /* 'doublePoints','steal','shield' */
+    const pk=p===1?'powerups1':'powerups2';
+    const cur=st[pk];
+    if(!cur[pu]||cur[pu]<=0)return st;
+    return{...st,[pk]:{...cur,[pu]:cur[pu]-1},activePowerup:{type:pu,player:p}};
+}
+
+/* ── Solo Practice Mode ── */
+case 'START_SOLO':{
+    const u=new Set();
+    const q=pickQ(a.diff||'junior',u,a.cat||null,null,a.scope||'sk');
+    if(q)u.add(q.id);
+    return{...st,screen:'solo',soloMode:true,soloScore:0,soloCorrect:0,soloWrong:0,soloCategory:a.cat||'',
+        diff:a.diff||'junior',scope:a.scope||'sk',curQ:q,usedIds:u,revealed:false,answered:false};
+}
+case 'SOLO_CORRECT':{
+    const u2=new Set(st.usedIds);
+    const nq=pickQ(st.diff,u2,st.soloCategory||null,null,st.scope);if(nq)u2.add(nq.id);
+    return{...st,soloScore:st.soloScore+10,soloCorrect:st.soloCorrect+1,curQ:nq,usedIds:u2,revealed:false,answered:false};
+}
+case 'SOLO_WRONG':{
+    const u2=new Set(st.usedIds);
+    const nq=pickQ(st.diff,u2,st.soloCategory||null,null,st.scope);if(nq)u2.add(nq.id);
+    return{...st,soloWrong:st.soloWrong+1,curQ:nq,usedIds:u2,revealed:false,answered:false};
+}
+case 'SOLO_REVEAL':return{...st,revealed:true};
+case 'END_SOLO':return{...st,soloMode:false,screen:'home',curQ:null};
+
+/* ── Blitz Mode ── */
+case 'START_BLITZ':{
+    const u=new Set(getRecentUsedIds());
+    const q=pickQ('junior',u,null,null,st.scope);if(q)u.add(q.id);
+    return{...st,screen:'game',gameOn:true,over:false,blitzMode:true,
+        round:1,qNum:0,curQ:q,usedIds:u,
+        s1:0,s2:0,active:1,tRun:false,tSec:BLITZ_TIME,
+        pts:BLITZ_PTS,revealed:false,answered:false,
+        winner:null,selCat:null,tb1:'',tb2:'',
+        r1phase:1,r1qCount:0,r1timer:BLITZ_TIME,r1tRun:false,
+        showRoundSummary:false,summaryRound:null,
+        usedCats:[],roundCats:[],catQCounts:{},passing:false,originalActive:1,tbWinner:null,
+        streak1:0,streak2:0,maxStreak1:0,maxStreak2:0,
+        powerups1:{doublePoints:1,steal:1,shield:1},powerups2:{doublePoints:1,steal:1,shield:1},activePowerup:null,
+        stats:{r1:{p1c:0,p1w:0,p2c:0,p2w:0},r2:{p1c:0,p1w:0,p2c:0,p2w:0},r3:{p1c:0,p1w:0,p2c:0,p2w:0}},askedQuestions:[],
+        totalRounds:1}
+}
+
 default:return st;
 }
 }
@@ -859,6 +874,7 @@ useEffect(()=>{
         theme:st.settings.theme||'dark',
         feedback:st.feedback,
         scope:st.scope||'sk',
+        streak1:st.streak1,streak2:st.streak2,activePowerup:st.activePowerup,blitzMode:st.blitzMode||false,
     };
     sendTV('UPDATE',payload);
 },[st.testMode,st.gameOn,st.screen,st.showRoundSummary,st.round,st.qNum,st.r1qCount,
@@ -982,13 +998,14 @@ return(
     )}
     <div className="flex flex-col gap-3 w-80">
         <Btn cls="bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400 text-lg py-4 shadow-lg shadow-yellow-500/20" onClick={()=>dp({type:'NAV',to:'setup'})}>🎮 Nová hra</Btn>
+        <Btn cls="bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-500 hover:to-indigo-500 py-3 shadow-lg shadow-purple-500/20" onClick={()=>dp({type:'NAV',to:'solo'})}>🧠 Sólo tréning</Btn>
         <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'players'})}>👤 Hráči</Btn>
         <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'leaderboard'})}>🏆 Rebríček</Btn>
         <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'hist'})}>📋 História</Btn>
         <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'settings'})}>⚙️ Nastavenia</Btn>
         <Btn cls="hover:scale-[1.02] border py-3" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'qeditor'})}>✏️ Editor otázok</Btn>
     </div>
-    <p className="text-xs mt-4" style={{color:'var(--border)'}}>v3.0</p>
+    <p className="text-xs mt-4" style={{color:'var(--border)'}}>v3.1</p>
 </div>
 );
 }
@@ -1683,6 +1700,10 @@ else{
     const isActiveAndR1=isR1&&isActive&&!st.answered;
     const isActiveR23=(isR2||isR3)&&isActive&&st.curQ&&!st.answered;
     const av=num===1?st.p1?.avatar:st.p2?.avatar;
+    const streak=num===1?st.streak1:st.streak2;
+    const pups=num===1?st.powerups1:st.powerups2;
+    const apw=st.activePowerup;
+    const hasPwActive=apw&&apw.player===num;
     return(
         <div className={`rounded-2xl p-4 border-2 transition-all duration-300 ${
             isActive?(num===1?'border-p1 bg-blue-500/10 shadow-lg shadow-blue-500/20':'border-p2 bg-red-500/10 shadow-lg shadow-red-500/20')
@@ -1693,6 +1714,8 @@ else{
                 <span className="font-bold">{name}</span>
                 {isActive&&<span className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded-lg font-bold">ODPOVEDÁ</span>}
                 {st.passing&&isActive&&<span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-lg font-bold">SUPER</span>}
+                {/* Streak indicator */}
+                {streak>=2&&<span className={`text-[10px] px-2 py-0.5 rounded-lg font-bold ${streak>=STREAK_THRESHOLD?'bg-orange-500/30 text-orange-300 animate-pulse':'bg-orange-500/15 text-orange-400'}`}>🔥{streak}{streak>=STREAK_THRESHOLD&&` +${STREAK_BONUS}`}</span>}
             </div>
             <div className="flex items-center gap-2">
                 <button onClick={()=>dp({type:'ADJ_SCORE',p:num,delta:-10})}
@@ -1702,6 +1725,22 @@ else{
                     className="w-7 h-7 rounded-lg text-xs font-bold hover:opacity-80 flex items-center justify-center" style={{background:'var(--card2)',color:'var(--textSub)'}}>+</button>
             </div>
             <div className="text-xs" style={{color:'var(--textSub)'}}>bodov</div>
+            {/* Active power-up indicator */}
+            {hasPwActive&&<div className="mt-1 text-center"><span className="text-[10px] px-2 py-0.5 rounded-lg font-bold bg-purple-500/30 text-purple-300 animate-pulse">{apw.type==='doublePoints'?'⚡ 2× body':apw.type==='steal'?'🦹 Krádež':apw.type==='shield'?'🛡️ Štít':''} AKTÍVNE</span></div>}
+            {/* Power-up buttons */}
+            {isActive&&!st.answered&&st.gameOn&&(
+                <div className="flex gap-1 mt-2 justify-center">
+                    <button onClick={()=>dp({type:'USE_POWERUP',player:num,powerup:'doublePoints'})} disabled={!pups.doublePoints||!!apw}
+                        className={`text-[10px] px-2 py-1 rounded-lg font-bold transition-all ${pups.doublePoints&&!apw?'bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/40 cursor-pointer':'opacity-30 cursor-not-allowed'}`}
+                        title="Dvojité body">⚡2× {pups.doublePoints?'':'✗'}</button>
+                    <button onClick={()=>dp({type:'USE_POWERUP',player:num,powerup:'steal'})} disabled={!pups.steal||!!apw}
+                        className={`text-[10px] px-2 py-1 rounded-lg font-bold transition-all ${pups.steal&&!apw?'bg-red-500/20 text-red-300 hover:bg-red-500/40 cursor-pointer':'opacity-30 cursor-not-allowed'}`}
+                        title="Ukradni body súperovi">🦹 {pups.steal?'':'✗'}</button>
+                    <button onClick={()=>dp({type:'USE_POWERUP',player:num,powerup:'shield'})} disabled={!pups.shield||!!apw}
+                        className={`text-[10px] px-2 py-1 rounded-lg font-bold transition-all ${pups.shield&&!apw?'bg-blue-500/20 text-blue-300 hover:bg-blue-500/40 cursor-pointer':'opacity-30 cursor-not-allowed'}`}
+                        title="Ochrana pred stratou bodov">🛡️ {pups.shield?'':'✗'}</button>
+                </div>
+            )}
             {isActiveAndR1&&st.r1tRun&&(
                 <div className="flex gap-2 mt-3 flex-wrap">
                     <Btn cls="bg-ok/20 text-ok hover:bg-ok/30 text-sm py-2 px-3 flex-1" onClick={r1Correct}>✓ Správne</Btn>
@@ -2003,6 +2042,76 @@ const p1tc=ts.r1.p1c+ts.r2.p1c+ts.r3.p1c,p1tw=ts.r1.p1w+ts.r2.p1w+ts.r3.p1w;
 const p2tc=ts.r1.p2c+ts.r2.p2c+ts.r3.p2c,p2tw=ts.r1.p2w+ts.r2.p2w+ts.r3.p2w;
 const doSave=()=>{dp({type:'SAVE'});setSaved(true);SFX.fanfare()};
 
+/* SVG bar chart helper */
+const BarChart=({data,title,width=360,barH=22})=>{
+    const maxVal=Math.max(...data.map(d=>Math.max(d.v1,d.v2)),1);
+    const h=data.length*(barH*2+16)+40;
+    return(
+        <div className="mb-4">
+            <h4 className="text-sm font-bold text-accent mb-2 text-center">{title}</h4>
+            <svg viewBox={`0 0 ${width} ${h}`} width="100%" height={h} className="rounded-xl" style={{background:'rgba(0,0,0,.15)'}}>
+                {data.map((d,i)=>{
+                    const y=i*(barH*2+16)+8;
+                    const w1=maxVal>0?(d.v1/maxVal)*(width-100):0;
+                    const w2=maxVal>0?(d.v2/maxVal)*(width-100):0;
+                    return <g key={i}>
+                        <text x="4" y={y+14} fontSize="10" fill="#94a3b8" fontWeight="600">{d.label}</text>
+                        <rect x="80" y={y} width={Math.max(w1,2)} height={barH} rx="4" fill="#3b82f6" opacity=".8"/>
+                        <text x={82+w1} y={y+15} fontSize="10" fill="#93c5fd" fontWeight="700">{d.v1}</text>
+                        <rect x="80" y={y+barH+2} width={Math.max(w2,2)} height={barH} rx="4" fill="#ef4444" opacity=".8"/>
+                        <text x={82+w2} y={y+barH+17} fontSize="10" fill="#fca5a5" fontWeight="700">{d.v2}</text>
+                    </g>;
+                })}
+                <line x1="80" y1="0" x2="80" y2={h} stroke="#475569" strokeWidth=".5"/>
+            </svg>
+        </div>
+    );
+};
+
+const chartCorrect=[
+    {label:'1. kolo',v1:ts.r1.p1c,v2:ts.r1.p2c},
+    {label:'2. kolo',v1:ts.r2.p1c,v2:ts.r2.p2c},
+    {label:'3. kolo',v1:ts.r3.p1c,v2:ts.r3.p2c},
+];
+const chartWrong=[
+    {label:'1. kolo',v1:ts.r1.p1w,v2:ts.r1.p2w},
+    {label:'2. kolo',v1:ts.r2.p1w,v2:ts.r2.p2w},
+    {label:'3. kolo',v1:ts.r3.p1w,v2:ts.r3.p2w},
+];
+
+const exportPDF=()=>{
+    /* Use browser print dialog for PDF export */
+    const style=document.createElement('style');
+    style.id='print-style';
+    style.textContent=`@media print{body>*{display:none!important}#print-results{display:block!important;position:static!important;color:#000!important;background:#fff!important;font-family:Inter,system-ui,sans-serif}#print-results h1,#print-results h2,#print-results h3{color:#000!important}#print-results .text-p1{color:#2563eb!important}#print-results .text-p2{color:#dc2626!important}#print-results .text-accent{color:#d97706!important}#print-results .text-ok,.text-green-400{color:#16a34a!important}#print-results .text-red-400{color:#dc2626!important}}`;
+    document.head.appendChild(style);
+    /* Create printable div */
+    const div=document.createElement('div');
+    div.id='print-results';
+    div.style.cssText='padding:32px;max-width:700px;margin:0 auto';
+    div.innerHTML=`<h1 style="text-align:center;font-size:24px;font-weight:900;color:#d97706;margin-bottom:4px">🏆 Vedomostný QUIZ 2026</h1>
+    <p style="text-align:center;color:#666;margin-bottom:24px">${st.gameDate||new Date().toISOString().slice(0,10)} · ${DIFF_LABELS[st.diff]||st.diff}</p>
+    <h2 style="text-align:center;font-size:20px;font-weight:800;margin-bottom:16px">Víťaz: ${wn}</h2>
+    <div style="display:flex;justify-content:center;gap:48px;margin-bottom:24px">
+      <div style="text-align:center"><div style="color:#2563eb;font-weight:600">${st.p1?.name}</div><div style="font-size:36px;font-weight:900;color:#2563eb">${st.s1}</div></div>
+      <div style="font-size:28px;padding-top:24px;color:#999">:</div>
+      <div style="text-align:center"><div style="color:#dc2626;font-weight:600">${st.p2?.name}</div><div style="font-size:36px;font-weight:900;color:#dc2626">${st.s2}</div></div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:24px">
+      <thead><tr style="border-bottom:2px solid #ccc"><th style="text-align:left;padding:6px">Kolo</th><th style="padding:6px;color:#2563eb">${st.p1?.name}</th><th style="padding:6px;color:#dc2626">${st.p2?.name}</th></tr></thead>
+      <tbody>
+        <tr style="border-bottom:1px solid #eee"><td style="padding:6px">1. Rýchla</td><td style="padding:6px;text-align:center">${ts.r1.p1c}✓ ${ts.r1.p1w}✗</td><td style="padding:6px;text-align:center">${ts.r1.p2c}✓ ${ts.r1.p2w}✗</td></tr>
+        <tr style="border-bottom:1px solid #eee"><td style="padding:6px">2. Hlavná</td><td style="padding:6px;text-align:center">${ts.r2.p1c}✓ ${ts.r2.p1w}✗</td><td style="padding:6px;text-align:center">${ts.r2.p2c}✓ ${ts.r2.p2w}✗</td></tr>
+        <tr style="border-bottom:1px solid #eee"><td style="padding:6px">3. Finálová</td><td style="padding:6px;text-align:center">${ts.r3.p1c}✓ ${ts.r3.p1w}✗</td><td style="padding:6px;text-align:center">${ts.r3.p2c}✓ ${ts.r3.p2w}✗</td></tr>
+        <tr style="border-top:2px solid #ccc;font-weight:700"><td style="padding:6px">Celkovo</td><td style="padding:6px;text-align:center">${p1tc}✓ ${p1tw}✗</td><td style="padding:6px;text-align:center">${p2tc}✓ ${p2tw}✗</td></tr>
+      </tbody>
+    </table>
+    <p style="text-align:center;color:#999;font-size:11px">Vedomostný QUIZ 2026 · duel-gregovci.surge.sh</p>`;
+    document.body.appendChild(div);
+    window.print();
+    setTimeout(()=>{div.remove();style.remove()},1000);
+};
+
 const content=(
 <div className="flex flex-col items-center justify-center p-6 max-w-2xl mx-auto">
     <div className="anim-pop text-center w-full">
@@ -2046,6 +2155,22 @@ const content=(
                 </tbody>
             </table>
         </Card>
+        {/* Charts */}
+        <Card cls="mb-6 w-full">
+            <h3 className="text-lg font-bold text-accent mb-3 text-center">📈 Grafy výkonu</h3>
+            <div className="flex items-center justify-center gap-4 mb-3 text-xs">
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-p1 inline-block"></span> {st.p1?.name}</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-p2 inline-block"></span> {st.p2?.name}</span>
+            </div>
+            <BarChart data={chartCorrect} title="✓ Správne odpovede"/>
+            <BarChart data={chartWrong} title="✗ Nesprávne odpovede"/>
+            {(st.maxStreak1>0||st.maxStreak2>0)&&(
+                <div className="flex items-center justify-center gap-8 mt-2 text-sm">
+                    <span className="text-p1">🔥 Max séria {st.p1?.name}: <b>{st.maxStreak1}</b></span>
+                    <span className="text-p2">🔥 Max séria {st.p2?.name}: <b>{st.maxStreak2}</b></span>
+                </div>
+            )}
+        </Card>
         {/* Post-game question review */}
         {st.askedQuestions?.length>0&&(
         <Card cls="mb-6 w-full">
@@ -2070,6 +2195,7 @@ const content=(
         <div className="flex gap-3 flex-wrap justify-center">
             {!saved?<Btn cls="bg-ok text-white hover:bg-green-600 py-3 px-6 shadow-lg shadow-green-500/20" onClick={doSave}>💾 Uložiť do tabuľky víťazov</Btn>
                 :<span className="text-ok font-bold py-3 px-6">✓ Uložené!</span>}
+            <Btn cls="bg-indigo-600 text-white hover:bg-indigo-500 py-3 px-6" onClick={exportPDF}>📄 PDF export</Btn>
             <Btn cls="py-3 px-6 border" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'NAV',to:'setup'})}>🔄 Nová hra</Btn>
             <Btn cls="py-3 px-6 border" style={{background:'var(--card)',borderColor:'var(--border)'}} onClick={()=>dp({type:'END_GAME'})}>🏠 Domov</Btn>
         </div>
@@ -2879,6 +3005,104 @@ return(
 );
 }
 
+/* ════════════ SOLO PRACTICE ════════════ */
+function SoloScreen(){
+const{st,dp}=use$();
+const[selCat,setSelCat]=useState('');
+const[diff,setDiff]=useState(st.diff||'junior');
+const[scope,setScope]=useState(st.scope||'sk');
+const[started,setStarted]=useState(st.soloMode&&st.curQ);
+const cats=useMemo(()=>{
+    const base=scope==='mix'?[...new Set([...SK_CATS,...SVET_CATS])]:(SCOPE_CATS[scope]||SK_CATS);
+    return base.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&(scope==='mix'||q.scope===scope)&&q.type!=='tiebreaker'));
+},[diff,scope]);
+const startSolo=()=>{dp({type:'START_SOLO',diff,cat:selCat||null,scope});setStarted(true)};
+if(!started||!st.soloMode)return(
+<div className="max-w-lg mx-auto p-6">
+    <button onClick={()=>dp({type:'NAV',to:'home'})} style={{color:'var(--textSub)'}} className="hover:text-accent mb-4 transition-colors">← Späť</button>
+    <h2 className="text-3xl font-bold mb-6">🧠 Sólo tréning</h2>
+    <Card cls="space-y-5">
+        <div>
+            <label className="block text-sm mb-2" style={{color:'var(--textSub)'}}>Obtiažnosť</label>
+            <div className="flex gap-2">
+                {Object.entries(DIFF_LABELS).map(([k,v])=>(
+                    <button key={k} onClick={()=>setDiff(k)} className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${diff===k?'bg-accent text-black shadow-lg':''}`}
+                        style={diff!==k?{background:'var(--card2)'}:{}}>{v}</button>
+                ))}
+            </div>
+        </div>
+        <div>
+            <label className="block text-sm mb-2" style={{color:'var(--textSub)'}}>Rozsah</label>
+            <div className="flex gap-2">
+                {[['sk','🇸🇰 SK'],['svet','🌍 Svet'],['mix','🔀 Mix']].map(([k,v])=>(
+                    <button key={k} onClick={()=>{setScope(k);setSelCat('')}} className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${scope===k?'bg-accent text-black shadow-lg':''}`}
+                        style={scope!==k?{background:'var(--card2)'}:{}}>{v}</button>
+                ))}
+            </div>
+        </div>
+        <div>
+            <label className="block text-sm mb-2" style={{color:'var(--textSub)'}}>Kategória (voliteľné)</label>
+            <select value={selCat} onChange={e=>setSelCat(e.target.value)}
+                className="w-full rounded-xl px-3 py-2 outline-none focus:ring-2 ring-accent text-sm" style={{background:'var(--inputBg)',color:'var(--text)'}}>
+                <option value="">Všetky kategórie</option>
+                {cats.map(c=><option key={c} value={c}>{CAT_ICONS[c]||'❓'} {CAT_LABELS[c]||c}</option>)}
+            </select>
+        </div>
+        <Btn cls="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-500 hover:to-indigo-500 py-4 text-lg shadow-lg" onClick={startSolo}>
+            🧠 Začať tréning</Btn>
+    </Card>
+</div>
+);
+/* Active solo session */
+return(
+<div className="max-w-lg mx-auto p-6">
+    <div className="flex items-center justify-between mb-4">
+        <button onClick={()=>{dp({type:'END_SOLO'});setStarted(false)}} style={{color:'var(--textSub)'}} className="hover:text-red-400 transition-colors">✕ Ukončiť</button>
+        <div className="flex items-center gap-3">
+            <span className="text-green-400 font-bold">{st.soloCorrect}✓</span>
+            <span className="text-red-400 font-bold">{st.soloWrong}✗</span>
+            <span className="text-accent font-black text-xl">{st.soloScore} b</span>
+        </div>
+    </div>
+    {st.curQ?(
+    <Card cls="anim-slide">
+        <div className="flex items-center gap-2 mb-3">
+            <span className="text-2xl">{CAT_ICONS[st.curQ.category]||'❓'}</span>
+            <span className="text-accent text-sm font-bold uppercase tracking-wider">{CAT_LABELS[st.curQ.category]||st.curQ.category}</span>
+            <span className="ml-auto text-xs px-2 py-0.5 rounded-lg" style={{background:'var(--card2)',color:'var(--textSub)'}}>{DIFF_LABELS[st.curQ.difficulty]||st.curQ.difficulty}</span>
+        </div>
+        <p className="text-xl font-semibold mb-4 leading-relaxed">{st.curQ.question}</p>
+        {st.curQ.img&&<div className="mb-4 flex justify-center"><img src={st.curQ.img} alt="" className="max-h-48 rounded-xl shadow-lg" style={{objectFit:'contain'}}/></div>}
+        {!st.revealed?(
+            <Btn cls="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-500 py-3 text-lg" onClick={()=>dp({type:'SOLO_REVEAL'})}>
+                👁️ Ukázať odpoveď</Btn>
+        ):(
+            <div className="space-y-3">
+                <div className="rounded-xl p-3" style={{background:'var(--card2)'}}>
+                    <p className="text-ok font-bold text-xl text-center">✓ {st.curQ.answer}</p>
+                </div>
+                <p className="text-center text-sm" style={{color:'var(--textSub)'}}>Vedel/a si odpoveď?</p>
+                <div className="flex gap-3">
+                    <Btn cls="flex-1 bg-ok/20 text-ok hover:bg-ok/30 py-3 text-lg" onClick={()=>dp({type:'SOLO_CORRECT'})}>✓ Áno (+10)</Btn>
+                    <Btn cls="flex-1 bg-red-500/20 text-red-400 hover:bg-red-500/30 py-3 text-lg" onClick={()=>dp({type:'SOLO_WRONG'})}>✗ Nie</Btn>
+                </div>
+            </div>
+        )}
+    </Card>
+    ):(
+    <Card>
+        <div className="text-center py-8">
+            <p className="text-5xl mb-4">🎉</p>
+            <p className="text-xl font-bold mb-2">Otázky sa minuli!</p>
+            <p className="text-lg text-accent font-bold mb-4">Skóre: {st.soloScore} | {st.soloCorrect}✓ {st.soloWrong}✗</p>
+            <Btn cls="bg-accent text-black hover:bg-yellow-400 py-3 px-6" onClick={()=>{dp({type:'END_SOLO'});setStarted(false)}}>🏠 Späť domov</Btn>
+        </div>
+    </Card>
+    )}
+</div>
+);
+}
+
 /* ════════════ APP ════════════ */
 function App(){
 const{st}=use$();
@@ -2893,6 +3117,7 @@ switch(st.screen){
     case 'hist':return <HistoryScreen/>;
     case 'settings':return <SettingsScreen/>;
     case 'qeditor':return <QuestionEditorScreen/>;
+    case 'solo':return <SoloScreen/>;
     default:return <HomeScreen/>;
 }
 })();
@@ -2904,10 +3129,22 @@ const[user,setUser]=useState('');
 const[pass,setPass]=useState('');
 const[err,setErr]=useState('');
 const[show,setShow]=useState(false);
-const handle=e=>{
+const[busy,setBusy]=useState(false);
+const handle=async(e)=>{
 e.preventDefault();
-if(user==='mgrega'&&pass==='Nowire2086*'){sessionStorage.setItem('quiz_auth','1');onLogin();}
-else{setErr('Nesprávne meno alebo heslo!');setTimeout(()=>setErr(''),2500);}
+if(busy)return;
+setBusy(true);
+try{
+  const enc=new TextEncoder();
+  const buf=await crypto.subtle.digest('SHA-256',enc.encode(user+':'+pass));
+  const hash=Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  if(hash===_C.AUTH_HASH){sessionStorage.setItem('quiz_auth','1');onLogin();}
+  else{setErr('Nesprávne meno alebo heslo!');setTimeout(()=>setErr(''),2500);}
+}catch(ex){
+  /* Fallback for environments without crypto.subtle */
+  if(user==='mgrega'&&pass==='Nowire2086*'){sessionStorage.setItem('quiz_auth','1');onLogin();}
+  else{setErr('Nesprávne meno alebo heslo!');setTimeout(()=>setErr(''),2500);}
+}finally{setBusy(false)}
 };
 return(
 <div style={{background:'linear-gradient(135deg,#0f172a,#1e293b)',minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Inter,system-ui,sans-serif'}}>
