@@ -105,11 +105,11 @@ rieky_sk:'Rieky Slovenska',vlajky_erby_sk:'Erby a vlajky',pravopis_sk:'Pravopis'
 veda_technika_sk:'Veda a technika',nabozenstvo_sk:'Náboženstvo',divadlo_sk:'Divadlo a film',
 pocasie_sk:'Počasie a príroda',skauting_sk:'Skauting',zaujimavosti_sk:'Zaujímavosti',
 /* SVET */
-dejiny_svet:'Dejiny sveta',geografia_svet:'Geografia',hlavne_mesta:'Hlavné mestá',sport_svet:'Šport',
-opera_svet:'Opera a hudba',divadlo_svet:'Divadlo',vlajky_svet:'Vlajky štátov',umenie_svet:'Umenie',
-veda_technika_svet:'Veda a technika',literatura_svet:'Literatúra',hudba_svet:'Hudba',film_svet:'Film',
-matematika_svet:'Matematika',osobnosti_svet:'Osobnosti',priroda_svet:'Príroda',
-informatika_svet:'Informatika',astronomia:'Vesmír',zaujimavosti_svet:'Zaujímavosti',
+dejiny_svet:'Dejiny sveta',geografia_svet:'Geografia 🌍',hlavne_mesta:'Hlavné mestá',sport_svet:'Šport 🌍',
+opera_svet:'Opera a hudba',divadlo_svet:'Divadlo 🌍',vlajky_svet:'Vlajky štátov',umenie_svet:'Umenie',
+veda_technika_svet:'Veda a technika 🌍',literatura_svet:'Literatúra 🌍',hudba_svet:'Hudba',film_svet:'Film',
+matematika_svet:'Matematika 🌍',osobnosti_svet:'Osobnosti 🌍',priroda_svet:'Príroda 🌍',
+informatika_svet:'Informatika 🌍',astronomia:'Vesmír',zaujimavosti_svet:'Zaujímavosti 🌍',
 olympijske_hry:'Olympijské hry',kulinarka:'Kuchyne sveta',
 };
 const CAT_ICONS={
@@ -215,7 +215,10 @@ function pickRoundCats(diff,scope,n=10){
     const _sf=_scopeFilter(scope);
     const avail=base.filter(c=>QUESTIONS_DB.some(q=>q.difficulty===diff&&q.category===c&&_sf(q)&&q.type!=='tiebreaker'));
     const shuffled=[...avail].sort(()=>Math.random()-.5);
-    return shuffled.slice(0,n);
+    /* Deduplicate by display label – prevents e.g. informatika_sk + informatika_svet both showing as "Informatika" */
+    const seenLabels=new Set();
+    const deduped=shuffled.filter(c=>{const l=(CAT_LABELS[c]||c).toLowerCase();if(seenLabels.has(l))return false;seenLabels.add(l);return true});
+    return deduped.slice(0,n);
 }
 
 /* ─── FIREBASE ─── */
