@@ -18,7 +18,7 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="questions.js?v=20260304b"></script>
+<script src="questions.js?v=20260305a"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 body{font-family:'Inter',system-ui,sans-serif;margin:0;transition:background .3s,color .3s}
@@ -534,7 +534,7 @@ case 'REVEAL':return{...st,revealed:true};
 
 /* ── CORRECT ── */
 case 'CORRECT':{
-const snap={s1:st.s1,s2:st.s2,stats:JSON.parse(JSON.stringify(st.stats)),answered:st.answered,active:st.active,passing:st.passing,feedback:st.feedback,revealed:st.revealed};
+const snap={s1:st.s1,s2:st.s2,stats:JSON.parse(JSON.stringify(st.stats)),answered:st.answered,active:st.active,passing:st.passing,feedback:st.feedback,revealed:st.revealed,askedQuestions:[...st.askedQuestions]};
 const p=st.active;
 const rk=st.round===1?'r1':st.round===2?'r2':'r3';
 const sk=p===1?'p1c':'p2c';
@@ -549,7 +549,7 @@ return{...st,s1:p===1?st.s1+pv:st.s1,s2:p===2?st.s2+pv:st.s2,answered:true,tRun:
 
 /* ── WRONG ── */
 case 'WRONG':{
-const snap={s1:st.s1,s2:st.s2,stats:JSON.parse(JSON.stringify(st.stats)),answered:st.answered,active:st.active,passing:st.passing,feedback:st.feedback,revealed:st.revealed};
+const snap={s1:st.s1,s2:st.s2,stats:JSON.parse(JSON.stringify(st.stats)),answered:st.answered,active:st.active,passing:st.passing,feedback:st.feedback,revealed:st.revealed,askedQuestions:[...st.askedQuestions]};
 const p=st.active;
 const rk=st.round===1?'r1':st.round===2?'r2':'r3';
 const sk=p===1?'p1w':'p2w';
@@ -861,7 +861,10 @@ useEffect(()=>{
         scope:st.scope||'sk',
     };
     sendTV('UPDATE',payload);
-});
+},[st.testMode,st.gameOn,st.screen,st.showRoundSummary,st.round,st.qNum,st.r1qCount,
+    st.s1,st.s2,st.active,st.tRun,st.tSec,st.pts,st.over,st.winner,st.answered,
+    st.r1phase,st.r1timer,st.r1tRun,st.selCat,st.summaryRound,st.passing,
+    st.revealed,st.curQ?.id,st.tb1,st.tb2,st.tbWinner,st.feedback]);
 
 useEffect(()=>{
     SFX.enabled=st.settings.sound;
@@ -909,12 +912,10 @@ useEffect(()=>{
 },[]);
 const pushToCloud=()=>{
     setSyncing(true);
-    Promise.all([
-      S.s('players',st.players),
-      S.s('history',st.history),
-      S.s('settings',st.settings),
-    ]);
-    setTimeout(()=>setSyncing(false),1500);
+    S.s('players',st.players);
+    S.s('history',st.history);
+    S.s('settings',st.settings);
+    setTimeout(()=>setSyncing(false),2000);
 };
 const resumeGame=()=>{dp({type:'RESTORE_GAME'});setSavedGame(null)};
 const discardSave=()=>{clearSavedGame();setSavedGame(null)};

@@ -158,8 +158,12 @@ function applyTheme(t){
 if(t==='light')document.body.classList.add('light');
 else document.body.classList.remove('light');
 }
+let _confettiActive=false;
 function spawnConfetti(){
+if(_confettiActive)return; /* Prevent duplicate confetti bursts */
+_confettiActive=true;
 const colors=['#eab308','#3b82f6','#ef4444','#22c55e','#a855f7','#f97316','#ec4899','#06b6d4','#fbbf24','#10b981'];
+const frag=document.createDocumentFragment();
 for(let i=0;i<120;i++){
     const el=document.createElement('div');el.className='confetti';
     el.style.left=Math.random()*100+'vw';
@@ -170,33 +174,23 @@ for(let i=0;i<120;i++){
     el.style.animationDelay=Math.random()*3+'s';
     el.style.borderRadius=Math.random()>.5?'50%':Math.random()>.5?'2px':'0';
     el.style.opacity=0.7+Math.random()*0.3;
-    document.body.appendChild(el);
-    setTimeout(()=>el.remove(),7000);
+    frag.appendChild(el);
 }
+document.body.appendChild(frag);
+setTimeout(()=>{document.querySelectorAll('.confetti').forEach(el=>el.remove());_confettiActive=false},8000);
 }
 
 /* ═══════════════ QR CODE GENERATOR (lightweight) ═══════════════ */
-function generateQRSvg(text,size){
-    /* Use the qrcode.js API via a simple URL-encoded SVG approach
-       We generate a QR code as an <img> pointing to a public QR API.
-       Fallback: return an SVG placeholder with the URL text. */
-    const url=`https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&format=svg`;
-    return `<img src="${url}" width="${size}" height="${size}" alt="QR" style="display:block"/>`;
+function getQRUrl(text,size){
+    return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&format=svg`;
 }
 
 /* ═══════════════ WAITING SCREEN ═══════════════ */
 function WaitingScreen({source}){
-/* Simple QR code as SVG using a lightweight generator */
-const qrRef=useRef(null);
-const[qrSvg,setQrSvg]=useState('');
+const[qrUrl,setQrUrl]=useState('');
 useEffect(()=>{
-    /* Generate QR code for the moderator URL */
     const url=window.location.origin+'/moderator.html';
-    /* Use a tiny QR encoder – generates a boolean matrix */
-    try{
-        const svg=generateQRSvg(url,120);
-        setQrSvg(svg);
-    }catch(e){console.warn('QR generation failed:',e)}
+    setQrUrl(getQRUrl(url,120));
 },[]);
 return(
 <div className="w-full h-full flex flex-col items-center justify-center standard-bg">
@@ -234,9 +228,9 @@ return(
     </div>
     <p className="text-slate-500 text-xl">Rodinná vedomostná súťaž</p>
     {/* QR code for moderator */}
-    {qrSvg&&(
+    {qrUrl&&(
     <div className="mt-6 flex flex-col items-center">
-        <div className="bg-white rounded-xl p-3" dangerouslySetInnerHTML={{__html:qrSvg}}/>
+        <div className="bg-white rounded-xl p-3"><img src={qrUrl} width="120" height="120" alt="QR kód" style={{display:'block'}}/></div>
         <p className="text-slate-600 text-xs mt-2">Naskenuj pre moderátora</p>
     </div>
     )}
